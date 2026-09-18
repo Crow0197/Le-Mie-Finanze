@@ -31,7 +31,7 @@ L’applicazione deve permettere di:
 4. Configurare spese ed entrate ricorrenti con frequenza, giorno, data iniziale e data finale opzionale.
 5. Salvare operazioni frequenti come modelli rapidi riutilizzabili.
 6. Gestire categorie di entrata e di spesa.
-7. Visualizzare saldo attuale, disponibilità fino al prossimo stipendio e risparmio previsto entro una data.
+7. Visualizzare saldo attuale, disponibilità TEST e risparmio previsto entro una data.
 8. Consultare movimenti passati e operazioni future.
 9. Impostare obiettivi di risparmio e un margine minimo di sicurezza.
 10. Esportare i propri dati in JSON e CSV senza servizi esterni.
@@ -156,7 +156,7 @@ L’interfaccia deve seguire una direzione moderna, calda e pulita, simile a una
 Mostra soltanto informazioni realmente utili:
 
 1. Saldo totale dei conti inclusi nel patrimonio.
-2. Disponibile fino al prossimo stipendio.
+2. Disponibile TEST.
 3. Risparmio previsto nel mese corrente.
 4. Lista degli ultimi cinque movimenti.
 5. Lista delle prossime cinque entrate o spese pianificate.
@@ -537,7 +537,7 @@ Somma `currentBalanceCents` dei conti con `includeInAvailable = true`.
 
 Trova la prossima occorrenza non ancora registrata della regola con `kind = salary`. Se esistono più stipendi, usa la prima occorrenza cronologica e somma quelli nello stesso giorno.
 
-### Disponibile fino al prossimo stipendio
+### Disponibile TEST
 
 ```text
 disponibile =
@@ -552,7 +552,7 @@ Il risultato visualizzato non deve essere inferiore a zero. Mostra separatamente
 ### Disponibilità giornaliera
 
 ```text
-disponibilità giornaliera = disponibile / giorni rimanenti fino al prossimo stipendio
+disponibilità giornaliera = disponibile / giorni rimanenti TEST
 ```
 
 ### Saldo previsto a una data
