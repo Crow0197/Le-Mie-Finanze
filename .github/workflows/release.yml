@@ -1,0 +1,63 @@
+# Rilascio manuale: alza la versione, la salva su main, crea il branch e il tag di rilascio
+# e pubblica su Firebase Hosting. Si lancia da Actions > Rilascio > Run workflow.
+name: Rilascio
+on:
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: Tipo di rilascio
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Alza il numero di versione
+        id: versione
+        run: |
+          npm version ${{ inputs.tipo }} --no-git-tag-version
+          VERSIONE=$(node -p "require('./package.json').version")
+          sed -i "s/APP_VERSION = '.*'/APP_VERSION = '$VERSIONE'/" src/app/core/app-version.ts
+          echo "versione=$VERSIONE" >> $GITHUB_OUTPUT
+
+      - run: npm ci && npm run build
+
+      - name: Salva la versione su main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src/app/core/app-version.ts
+          git commit -m "Rilascio v${{ steps.versione.outputs.versione }}"
+          git push origin main
+
+      - name: Crea il branch e il tag di rilascio
+        run: |
+          git branch release/v${{ steps.versione.outputs.versione }}
+          git push origin release/v${{ steps.versione.outputs.versione }}
+          git tag -a v${{ steps.versione.outputs.versione }} -m "Rilascio v${{ steps.versione.outputs.versione }}"
+          git push origin v${{ steps.versione.outputs.versione }}
+
+      - name: Pubblica su Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LE_MIE_FINANZE_9280F }}
+          channelId: live
+          projectId: le-mie-finanze-9280f
+
+      - name: Nota di rilascio
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create v${{ steps.versione.outputs.versione }} --target release/v${{ steps.versione.outputs.versione }} --title "v${{ steps.versione.outputs.versione }}" --generate-notes
