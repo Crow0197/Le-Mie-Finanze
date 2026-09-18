@@ -1,0 +1,57 @@
+# Controlla ogni 15 minuti se dal tuo Telegram è arrivato un comando di rilascio
+# (/rilascia patch, /rilascia minor, /rilascia major) e in quel caso lancia il rilascio.
+# Serve avere i segreti TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID.
+name: Comandi da Telegram
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  ascolta:
+    runs-on: ubuntu-latest
+    outputs:
+      tipo: ${{ steps.comando.outputs.tipo }}
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Leggi i messaggi
+        id: comando
+        if: env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          RISPOSTA=$(curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getUpdates?timeout=0")
+          TIPO=$(node -e '
+            const risposta = JSON.parse(process.argv[1]);
+            const chat = process.argv[2];
+            const adesso = Math.floor(Date.now() / 1000);
+            let tipo = "";
+            let ultimo = 0;
+            for (const aggiornamento of risposta.result || []) {
+              ultimo = Math.max(ultimo, aggiornamento.update_id);
+              const messaggio = aggiornamento.message;
+              if (!messaggio || String(messaggio.chat.id) !== chat) continue;
+              if (adesso - messaggio.date > 3600) continue;
+              const trovato = /^\/rilascia\s+(patch|minor|major)/i.exec(messaggio.text || "");
+              if (trovato) tipo = trovato[1].toLowerCase();
+            }
+            console.log(JSON.stringify({ tipo, offset: ultimo ? ultimo + 1 : 0 }));
+          ' "$RISPOSTA" "$TELEGRAM_CHAT_ID")
+          OFFSET=$(node -p "JSON.parse(process.argv[1]).offset" "$TIPO")
+          if [ "$OFFSET" != "0" ]; then
+            curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getUpdates?offset=$OFFSET&timeout=0" > /dev/null
+          fi
+          SCELTA=$(node -p "JSON.parse(process.argv[1]).tipo" "$TIPO")
+          echo "tipo=$SCELTA" >> $GITHUB_OUTPUT
+          if [ -n "$SCELTA" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode "text=Ricevuto: preparo il rilascio $SCELTA." > /dev/null
+          fi
+
+  rilascio:
+    needs: ascolta
+    if: needs.ascolta.outputs.tipo != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tipo: ${{ needs.ascolta.outputs.tipo }}
+    secrets: inherit
+    permissions:
+      contents: write
