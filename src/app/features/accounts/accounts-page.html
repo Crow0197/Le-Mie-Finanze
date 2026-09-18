@@ -1,0 +1,134 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Conti</h1>
+      <p class="page-header__subtitle">Conti bancari, carte, contanti e fondi di risparmio.</p>
+    </div>
+    @if (store.activeAccounts().length > 0) {
+      <button type="button" class="button button--primary" (click)="openForm()">
+        <app-icon name="plus" />
+        Nuovo conto
+      </button>
+    }
+  </header>
+
+  @if (!store.loaded()) {
+    <div class="card section" aria-busy="true">
+      <span class="visually-hidden">Caricamento dei conti in corso</span>
+      <app-skeleton height="48px" />
+      <app-skeleton height="48px" />
+    </div>
+  } @else if (store.activeAccounts().length === 0) {
+    <div class="card">
+      <app-empty-state
+        icon="wallet"
+        heading="Nessun conto attivo"
+        description="Aggiungi il conto da cui paghi più spesso: diventerà il conto predefinito."
+      >
+        <button type="button" class="button button--primary" (click)="openForm()">Crea il primo conto</button>
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="grid grid--2">
+      <div class="card stat">
+        <p class="stat__label">
+          Saldo totale
+          <app-info-hint label="Saldo totale" text="Somma dei conti con l'opzione Includi nel saldo totale attiva." />
+        </p>
+        <p class="stat__value amount" [class.amount--negative]="netWorthCents() < 0">{{ netWorthCents() | money }}</p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">
+          Denaro spendibile
+          <app-info-hint label="Denaro spendibile" text="Somma dei conti con l'opzione Includi nel denaro disponibile attiva." />
+        </p>
+        <p class="stat__value amount" [class.amount--negative]="availableCents() < 0">{{ availableCents() | money }}</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <ul class="list">
+        @for (account of store.activeAccounts(); track account.id; let first = $first, last = $last) {
+          <li class="list-item account">
+            <span class="item-icon" [style.color]="account.color">
+              <app-icon [name]="toIconName(account.icon, 'wallet')" />
+            </span>
+            <div class="list-item__main">
+              <strong>{{ account.name }}</strong>
+              <span>
+                {{ typeLabels[account.type] }}
+                @if (store.defaultAccount()?.id === account.id) {
+                  · <span class="badge badge--primary">Predefinito</span>
+                }
+                @if (!account.includeInNetWorth) {
+                  · Escluso dal saldo totale
+                }
+              </span>
+            </div>
+            <div class="account__balance">
+              <strong class="amount" [class.amount--negative]="account.currentBalanceCents < 0">
+                {{ account.currentBalanceCents | money }}
+              </strong>
+              @if (account.currentBalanceCents < 0) {
+                <span class="badge badge--danger">Saldo negativo</span>
+              }
+            </div>
+            <div class="list-item__actions">
+              <button type="button" class="icon-button" [attr.aria-label]="'Modifica ' + account.name" (click)="openForm(account)">
+                <app-icon name="pencil" [size]="18" />
+              </button>
+              @if (store.defaultAccount()?.id !== account.id) {
+                <button type="button" class="icon-button" [attr.aria-label]="'Imposta ' + account.name + ' come predefinito'" [disabled]="busy()" (click)="setDefault(account)">
+                  <app-icon name="star" [size]="18" />
+                </button>
+              }
+              <button type="button" class="icon-button" [attr.aria-label]="'Sposta su ' + account.name" [disabled]="first || busy()" (click)="move(account, -1)">
+                <app-icon name="arrow-up" [size]="18" />
+              </button>
+              <button type="button" class="icon-button" [attr.aria-label]="'Sposta giù ' + account.name" [disabled]="last || busy()" (click)="move(account, 1)">
+                <app-icon name="arrow-down" [size]="18" />
+              </button>
+              <button type="button" class="icon-button" [attr.aria-label]="'Archivia ' + account.name" [disabled]="busy()" (click)="archive(account)">
+                <app-icon name="archive" [size]="18" />
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  @if (archivedAccounts().length > 0) {
+    <section class="section">
+      <button
+        type="button"
+        class="button button--ghost details-toggle"
+        [attr.aria-expanded]="showArchived()"
+        aria-controls="archived-accounts"
+        (click)="showArchived.set(!showArchived())"
+      >
+        <app-icon name="chevron-down" [size]="18" />
+        Conti archiviati ({{ archivedAccounts().length }})
+      </button>
+      @if (showArchived()) {
+        <div id="archived-accounts" class="card">
+          <ul class="list">
+            @for (account of archivedAccounts(); track account.id) {
+              <li class="list-item">
+                <span class="item-icon"><app-icon [name]="toIconName(account.icon, 'wallet')" /></span>
+                <div class="list-item__main">
+                  <strong>{{ account.name }}</strong>
+                  <span>Archiviato · {{ account.currentBalanceCents | money }}</span>
+                </div>
+                <button type="button" class="button button--secondary button--small" [disabled]="busy()" (click)="restore(account)">
+                  <app-icon name="archive-restore" [size]="16" />
+                  Ripristina
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </section>
+  }
+</section>

@@ -1,0 +1,186 @@
+<form class="dialog" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <header class="dialog__header">
+    <h2 id="rule-form-title">
+      {{ isSalary ? (rule ? 'Modifica stipendio' : 'Configura stipendio') : rule ? 'Modifica ricorrenza' : 'Nuova ricorrenza' }}
+    </h2>
+    <button type="button" class="icon-button" aria-label="Chiudi" (click)="dialogRef.close()">
+      <app-icon name="x" />
+    </button>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert--danger" role="alert">{{ message }}</p>
+  }
+
+  @if (!isSalary) {
+    <div class="segmented" role="group" aria-label="Tipo di ricorrenza">
+      <button type="button" class="segmented__option" [attr.aria-pressed]="form.controls.transactionType.value === 'expense'" (click)="setType('expense')">
+        Spesa
+      </button>
+      <button type="button" class="segmented__option" [attr.aria-pressed]="form.controls.transactionType.value === 'income'" (click)="setType('income')">
+        Entrata
+      </button>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="rule-name">Nome</label>
+      <input
+        id="rule-name"
+        class="field__control"
+        type="text"
+        maxlength="80"
+        placeholder="Per esempio Affitto"
+        formControlName="name"
+        [attr.aria-invalid]="showError(form.controls.name)"
+        [attr.aria-describedby]="showError(form.controls.name) ? 'rule-name-error' : null"
+      />
+      @if (showError(form.controls.name)) {
+        <p id="rule-name-error" class="field__error">Inserisci un nome.</p>
+      }
+    </div>
+  }
+
+  <div class="field-row">
+    <div class="field">
+      <label class="field__label" for="rule-amount">{{ isSalary ? 'Importo previsto (€)' : 'Importo (€)' }}</label>
+      <input
+        id="rule-amount"
+        class="field__control"
+        type="text"
+        inputmode="decimal"
+        placeholder="0,00"
+        formControlName="amount"
+        [attr.aria-invalid]="showError(form.controls.amount)"
+        [attr.aria-describedby]="showError(form.controls.amount) ? 'rule-amount-error' : null"
+      />
+      @if (showError(form.controls.amount)) {
+        <p id="rule-amount-error" class="field__error">Inserisci un importo maggiore di zero.</p>
+      }
+    </div>
+    <div class="field">
+      <label class="field__label" for="rule-account">
+        {{ form.controls.transactionType.value === 'income' ? 'Conto di accredito' : 'Conto di addebito' }}
+      </label>
+      <select
+        id="rule-account"
+        class="field__control"
+        formControlName="accountId"
+        [attr.aria-invalid]="showError(form.controls.accountId)"
+        [attr.aria-describedby]="showError(form.controls.accountId) ? 'rule-account-error' : null"
+      >
+        <option value="" disabled>Seleziona un conto</option>
+        @for (account of accountOptions(); track account.id) {
+          <option [value]="account.id" [disabled]="account.archived">
+            {{ account.name }}{{ account.archived ? ' (archiviato)' : '' }}
+          </option>
+        }
+      </select>
+      @if (showError(form.controls.accountId)) {
+        <p id="rule-account-error" class="field__error">Ogni ricorrenza deve avere il suo conto.</p>
+      }
+    </div>
+  </div>
+
+  @if (!isSalary) {
+    <div class="field">
+      <label class="field__label" for="rule-category">Categoria</label>
+      <select
+        id="rule-category"
+        class="field__control"
+        formControlName="categoryId"
+        [attr.aria-invalid]="showError(form.controls.categoryId)"
+        [attr.aria-describedby]="showError(form.controls.categoryId) ? 'rule-category-error' : null"
+      >
+        <option value="" disabled>Seleziona una categoria</option>
+        @for (group of categoryGroups(); track group.macro.id) {
+          <option [value]="group.macro.id">{{ group.macro.name }}</option>
+          @for (child of group.children; track child.id) {
+            <option [value]="child.id">— {{ child.name }}</option>
+          }
+        }
+      </select>
+      @if (showError(form.controls.categoryId)) {
+        <p id="rule-category-error" class="field__error">Scegli una categoria.</p>
+      }
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field__label" for="rule-frequency">Frequenza</label>
+        <select id="rule-frequency" class="field__control" formControlName="frequency">
+          @for (frequency of frequencies; track frequency) {
+            <option [value]="frequency">{{ frequencyLabels[frequency] }}</option>
+          }
+        </select>
+      </div>
+      @if (form.controls.frequency.value === 'customMonths') {
+        <div class="field">
+          <label class="field__label" for="rule-interval">Ogni quanti mesi</label>
+          <input id="rule-interval" class="field__control" type="number" min="2" max="24" formControlName="interval" />
+        </div>
+      }
+    </div>
+  }
+
+  <div class="field-row">
+    @if (form.controls.frequency.value === 'weekly') {
+      <div class="field">
+        <label class="field__label" for="rule-weekday">Giorno della settimana</label>
+        <select id="rule-weekday" class="field__control" formControlName="dayOfWeek">
+          @for (day of weekdays; track $index) {
+            <option [value]="$index">{{ day }}</option>
+          }
+        </select>
+      </div>
+    } @else {
+      <div class="field">
+        <label class="field__label" for="rule-day">Giorno del mese</label>
+        <input
+          id="rule-day"
+          class="field__control"
+          type="number"
+          min="1"
+          max="31"
+          formControlName="dayOfMonth"
+          aria-describedby="rule-day-hint"
+        />
+        <p id="rule-day-hint" class="field__hint">Nei mesi più corti viene usato l'ultimo giorno valido.</p>
+      </div>
+    }
+    <div class="field">
+      <label class="field__label" for="rule-start">Data iniziale</label>
+      <input id="rule-start" class="field__control" type="date" formControlName="startDate" />
+    </div>
+  </div>
+
+  @if (pastOccurrences(); as past) {
+    <div class="alert alert--warning" role="status">
+      <app-icon name="triangle-alert" />
+      <div>
+        <p>
+          La data iniziale è nel passato: salvando registrerò {{ past.count }}
+          {{ past.count === 1 ? 'operazione già avvenuta' : 'operazioni già avvenute' }}
+          ({{ past.totalCents | money }}) e il saldo del conto cambierà. Se sono già nel saldo della banca, parti da oggi.
+        </p>
+        <button type="button" class="button button--secondary button--small" (click)="startFromToday()">Parti da oggi</button>
+      </div>
+    </div>
+  }
+
+  <div class="field">
+    <label class="field__label" for="rule-end">Data finale (facoltativa)</label>
+    <input id="rule-end" class="field__control" type="date" formControlName="endDate" />
+  </div>
+
+  <label class="checkbox">
+    <input type="checkbox" formControlName="autoPost" />
+    Registra automaticamente (altrimenti chiede conferma e puoi cambiare l'importo)
+  </label>
+
+  <footer class="dialog__footer">
+    <button type="button" class="button button--secondary" (click)="dialogRef.close()">Annulla</button>
+    <button type="submit" class="button button--primary" [disabled]="saving()">
+      {{ saving() ? 'Salvataggio…' : 'Salva' }}
+    </button>
+  </footer>
+</form>

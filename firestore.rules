@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isText(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    function isOptionalText(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
+    // Amounts are integer cents: 1 cent up to 1 billion euro.
+    function isPositiveAmount(value) {
+      return value is int && value > 0 && value <= 100000000000;
+    }
+
+    function isLocalDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidAccount(data) {
+      return isText(data.name, 60)
+        && data.type in ['bank', 'card', 'cash', 'savings', 'other']
+        && data.openingBalanceCents is int
+        && data.currentBalanceCents is int
+        && data.includeInNetWorth is bool
+        && data.includeInAvailable is bool
+        && data.sortOrder is int
+        && data.archived is bool;
+    }
+
+    // Every expense and income must have an account; transfers need two different accounts.
+    function isValidTransaction(data) {
+      return data.type in ['expense', 'income', 'transfer']
+        && data.status in ['confirmed', 'planned']
+        && isPositiveAmount(data.amountCents)
+        && isLocalDate(data.effectiveDate)
+        && isOptionalText(data.description, 200)
+        && (data.type == 'transfer'
+          ? isText(data.sourceAccountId, 128)
+            && isText(data.destinationAccountId, 128)
+            && data.sourceAccountId != data.destinationAccountId
+            && data.get('feeCents', 0) is int
+            && data.get('feeCents', 0) >= 0
+          : isText(data.accountId, 128));
+    }
+
+    // Every recurring rule must have its own account.
+    function isValidRecurringRule(data) {
+      return isText(data.name, 80)
+        && data.transactionType in ['expense', 'income']
+        && isPositiveAmount(data.amountCents)
+        && isText(data.accountId, 128)
+        && data.frequency in ['weekly', 'monthly', 'customMonths', 'yearly']
+        && data.interval is int
+        && data.interval >= 1
+        && isLocalDate(data.startDate)
+        && data.autoPost is bool
+        && data.status in ['active', 'paused', 'completed'];
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /accounts/{accountId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidAccount(request.resource.data);
+      }
+
+      match /transactions/{transactionId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidTransaction(request.resource.data);
+      }
+
+      match /recurringRules/{ruleId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidRecurringRule(request.resource.data);
+      }
+
+      match /categories/{categoryId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /quickTemplates/{templateId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /savingsGoals/{goalId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /budgets/{budgetId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

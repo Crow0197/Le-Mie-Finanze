@@ -1,0 +1,252 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Riepilogo</h1>
+      <p class="page-header__subtitle">
+        {{ userName() ? 'Ciao ' + userName() + ', ecco' : 'Ecco' }} la tua situazione al {{ today() | localDate }}.
+      </p>
+    </div>
+  </header>
+
+  @if (!store.loaded() || (loading() && !errorMessage())) {
+    <p class="loading-indicator" role="status">Carico la tua situazione…</p>
+    <div class="grid grid--3" aria-busy="true">
+      @for (item of [1, 2, 3]; track item) {
+        <div class="card stat">
+          <app-skeleton width="50%" height="14px" />
+          <app-skeleton width="70%" height="32px" />
+        </div>
+      }
+    </div>
+  } @else if (store.activeAccounts().length === 0) {
+    <div class="card">
+      <app-empty-state
+        icon="wallet"
+        heading="Nessun conto configurato"
+        description="Crea il tuo primo conto per iniziare a registrare entrate, spese e trasferimenti."
+      >
+        <a class="button button--primary" routerLink="/conti">Crea il primo conto</a>
+      </app-empty-state>
+    </div>
+  } @else {
+    @if (errorMessage(); as message) {
+      <div class="alert alert--danger" role="alert">
+        <app-icon name="circle-alert" />
+        <div class="dashboard__error">
+          <p>{{ message }}</p>
+          <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+        </div>
+      </div>
+    }
+
+    @if (available(); as availability) {
+      @if (availability.deficitCents > 0) {
+        <p class="alert alert--warning" role="status">
+          <app-icon name="triangle-alert" />
+          Attenzione: prima dello stipendio rischi di superare il margine di sicurezza di
+          {{ availability.deficitCents | money }}.
+        </p>
+      }
+    }
+
+    @if (dueCount() > 0) {
+      <a class="alert alert--warning dashboard__due" routerLink="/pianificate">
+        <app-icon name="calendar-clock" />
+        {{ dueCount() === 1 ? "C'è un'operazione pianificata" : 'Ci sono ' + dueCount() + ' operazioni pianificate' }}
+        da confermare.
+      </a>
+    }
+
+    <div class="grid grid--3">
+      <div class="card stat">
+        <p class="stat__label">
+          Saldo totale
+          <app-info-hint label="Saldo totale" text="Somma dei saldi attuali dei conti inclusi nel saldo totale." />
+        </p>
+        <p class="stat__value stat__value--hero amount" [class.amount--negative]="netWorthCents() < 0">
+          {{ netWorthCents() | money }}
+        </p>
+      </div>
+
+      <div class="card stat stat--wide">
+        <p class="stat__label">
+          Fino al prossimo stipendio
+          <app-info-hint
+            label="Fino al prossimo stipendio"
+            text="Quanto puoi ancora spendere prima del prossimo accredito. Parte dai soldi che hai adesso sui conti spendibili, toglie le spese fisse e le operazioni già programmate fino a quel giorno, e il margine di sicurezza. Cala a ogni spesa che registri."
+          />
+        </p>
+        @if (available(); as availability) {
+          <p class="stat__value amount">{{ availability.availableCents | money }}</p>
+          <p class="muted">
+            {{ availability.dailyCents | money }} al giorno per {{ availability.daysRemaining }}
+            {{ availability.daysRemaining === 1 ? 'giorno' : 'giorni' }}, fino al {{ nextSalary()?.date | localDate }}
+          </p>
+          <ul class="breakdown">
+            <li>
+              <span>Parti da (conti spendibili)</span>
+              <strong class="amount">{{ availability.startingCents | money }}</strong>
+            </li>
+            @if (availability.incomeCents > 0) {
+              <li>
+                <span>Entrate in arrivo</span>
+                <strong class="amount amount--positive">+{{ availability.incomeCents | money }}</strong>
+              </li>
+            }
+            <li>
+              <span>Spese fisse e pianificate</span>
+              <strong class="amount amount--negative">−{{ availability.expenseCents | money }}</strong>
+            </li>
+            @if (availability.safetyBufferCents > 0) {
+              <li>
+                <span>Margine di sicurezza</span>
+                <strong class="amount amount--negative">−{{ availability.safetyBufferCents | money }}</strong>
+              </li>
+            }
+            <li class="breakdown__total">
+              <span>Ti restano</span>
+              <strong class="amount">{{ availability.availableCents | money }}</strong>
+            </li>
+          </ul>
+        } @else {
+          <p class="muted">Configura lo stipendio per sapere quanto puoi spendere fino al prossimo accredito.</p>
+          <a class="button button--secondary button--small dashboard__cta" routerLink="/pianificate">Configura stipendio</a>
+        }
+      </div>
+
+      <div class="card stat">
+        <p class="stat__label">
+          A fine mese ti resterebbero
+          <app-info-hint
+            label="A fine mese ti resterebbero"
+            text="Parte dal saldo di oggi e toglie solo quello che deve ancora succedere entro fine mese: rate, abbonamenti e altre operazioni già programmate. Le spese che hai già fatto sono dentro il saldo di oggi, quindi non vengono tolte due volte."
+          />
+        </p>
+        <p class="stat__value amount" [class.amount--negative]="monthEnd().balanceCents < 0">
+          {{ monthEnd().balanceCents | money }}
+        </p>
+        <p class="muted">sui conti il {{ monthEnd().date | localDate }}</p>
+        <ul class="breakdown">
+          <li>
+            <span>Saldo di oggi</span>
+            <strong class="amount">{{ monthEnd().startingCents | money }}</strong>
+          </li>
+          @if (monthEnd().incomeCents > 0) {
+            <li>
+              <span>Entrate ancora in arrivo</span>
+              <strong class="amount amount--positive">+{{ monthEnd().incomeCents | money }}</strong>
+            </li>
+          }
+          <li>
+            <span>Rate e abbonamenti da pagare</span>
+            <strong class="amount amount--negative">−{{ monthEnd().recurringExpenseCents | money }}</strong>
+          </li>
+          @if (monthEnd().otherExpenseCents > 0) {
+            <li>
+              <span>Altre spese già programmate</span>
+              <strong class="amount amount--negative">−{{ monthEnd().otherExpenseCents | money }}</strong>
+            </li>
+          }
+          <li class="breakdown__total">
+            <span>Ti resterebbero</span>
+            <strong class="amount">{{ monthEnd().balanceCents | money }}</strong>
+          </li>
+        </ul>
+        <p class="muted">
+          Questo mese hai già speso {{ monthEnd().spentSoFarCents | money }}, già tolti dal saldo di oggi. Risparmio del mese
+          previsto: {{ monthForecast().netCents | money }}.
+        </p>
+      </div>
+    </div>
+
+    <div class="card dashboard__period">
+      <p class="stat__label">
+        Periodo di Movimenti e Resoconto
+        <app-info-hint
+          label="Periodo"
+          text="Sceglie l'intervallo di date usato dalle pagine Movimenti e Resoconto. Le card qui sopra non cambiano: guardano sempre a oggi, al prossimo stipendio e a fine mese."
+        />
+      </p>
+      <div class="dashboard__period-picker">
+        <label class="visually-hidden" for="dashboard-period">Periodo</label>
+        <select
+          id="dashboard-period"
+          class="field__control field__control--compact"
+          [ngModel]="viewPeriod.period().preset"
+          (ngModelChange)="changePeriod($event)"
+        >
+          @for (option of periodPresets; track option) {
+            <option [value]="option">{{ periodLabels[option] }}</option>
+          }
+        </select>
+        <span class="muted">{{ viewPeriod.label() }}</span>
+        <a class="muted dashboard__period-link" routerLink="/altro">Date scelte da me</a>
+      </div>
+    </div>
+
+    <div class="grid grid--2">
+      <section class="card section" aria-labelledby="dashboard-recent-title">
+        <div class="section__header">
+          <h2 id="dashboard-recent-title">Ultimi movimenti</h2>
+          <a routerLink="/movimenti" class="muted">Vedi tutti</a>
+        </div>
+        @if (recentItems().length === 0) {
+          <p class="muted">Nessun movimento registrato. Usa "Nuova operazione" per aggiungere la prima spesa.</p>
+        } @else {
+          <ul class="list">
+            @for (item of recentItems(); track item.transaction.id) {
+              <li>
+                <button type="button" class="list-item list-item--button" (click)="openTransaction(item.transaction)">
+                  <app-transaction-item [entry]="item.entry" />
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="card section" aria-labelledby="dashboard-upcoming-title">
+        <div class="section__header">
+          <h2 id="dashboard-upcoming-title">Prossime operazioni</h2>
+          <a routerLink="/pianificate" class="muted">Pianificate</a>
+        </div>
+        @if (upcoming().length === 0) {
+          <p class="muted">Nessuna entrata o spesa pianificata nei prossimi 60 giorni.</p>
+        } @else {
+          <ul class="list">
+            @for (entry of upcoming(); track $index) {
+              <li class="list-item">
+                <app-transaction-item [entry]="entry" />
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </div>
+
+    <section class="card section" aria-labelledby="dashboard-accounts-title">
+      <div class="section__header">
+        <h2 id="dashboard-accounts-title">Conti</h2>
+        <a routerLink="/conti" class="muted">Gestisci</a>
+      </div>
+      <ul class="list">
+        @for (account of store.activeAccounts(); track account.id) {
+          <li class="list-item">
+            <span class="item-icon" [style.color]="account.color">
+              <app-icon [name]="toIconName(account.icon, 'wallet')" />
+            </span>
+            <span class="list-item__main">
+              <strong>{{ account.name }}</strong>
+              @if (store.defaultAccount()?.id === account.id) {
+                <span>Predefinito</span>
+              }
+            </span>
+            <span class="amount" [class.amount--negative]="account.currentBalanceCents < 0">
+              {{ account.currentBalanceCents | money }}
+            </span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</section>

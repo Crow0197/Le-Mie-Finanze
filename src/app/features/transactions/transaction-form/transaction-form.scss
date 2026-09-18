@@ -1,0 +1,17 @@
+.type-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.details {
+  display: grid;
+  gap: var(--space-4);
+  animation: details-enter var(--duration-normal) var(--easing-standard);
+}
+
+@keyframes details-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

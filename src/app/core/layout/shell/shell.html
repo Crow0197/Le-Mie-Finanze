@@ -1,0 +1,107 @@
+<a class="skip-link" href="#main-content">Vai al contenuto</a>
+
+<aside class="sidebar">
+  <p class="sidebar__brand">
+    <span class="sidebar__logo"><app-icon name="wallet" /></span>
+    {{ appName }}
+  </p>
+
+  <nav aria-label="Navigazione principale">
+    <ul class="nav-list">
+      @for (item of desktopNavigation; track item.path) {
+        <li>
+          <a
+            class="nav-link"
+            [routerLink]="item.path"
+            routerLinkActive="nav-link--active"
+            [routerLinkActiveOptions]="{ exact: item.exact }"
+            ariaCurrentWhenActive="page"
+          >
+            <app-icon [name]="item.icon" />
+            {{ item.label }}
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <div class="sidebar__profile">
+    <app-icon name="circle-user" [size]="32" [strokeWidth]="1.5" />
+    <div class="sidebar__profile-text">
+      <strong>{{ displayName() }}</strong>
+      <span>{{ user()?.email }}</span>
+    </div>
+    <button type="button" class="icon-button" aria-label="Esci" (click)="signOut()">
+      <app-icon name="log-out" />
+    </button>
+  </div>
+</aside>
+
+<div class="shell__main">
+  <header class="topbar">
+    <button
+      type="button"
+      class="button button--primary"
+      aria-haspopup="dialog"
+      (click)="quickEntry.open()"
+    >
+      <app-icon name="plus" />
+      Nuova operazione
+    </button>
+  </header>
+
+  <main id="main-content" class="shell__content" tabindex="-1">
+    @if (loadError(); as message) {
+      <div class="alert alert--danger shell__error" role="alert">
+        <app-icon name="circle-alert" />
+        <div>
+          <p>{{ message }}</p>
+          <button type="button" class="button button--secondary button--small" (click)="initialize()">Riprova</button>
+        </div>
+      </div>
+    }
+    <router-outlet />
+  </main>
+</div>
+
+<nav class="bottom-nav" aria-label="Navigazione principale">
+  @for (item of mobileNavigationStart; track item.path) {
+    <a
+      class="bottom-nav__link"
+      [routerLink]="item.path"
+      routerLinkActive="bottom-nav__link--active"
+      [routerLinkActiveOptions]="{ exact: item.exact }"
+      ariaCurrentWhenActive="page"
+    >
+      <app-icon [name]="item.icon" />
+      {{ item.label }}
+    </a>
+  }
+
+  <button
+    type="button"
+    class="fab"
+    [class.fab--open]="quickEntry.isOpen()"
+    aria-label="Aggiungi operazione"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="quickEntry.isOpen()"
+    (click)="quickEntry.open()"
+  >
+    <app-icon name="plus" [size]="28" [strokeWidth]="2.5" />
+  </button>
+
+  @for (item of mobileNavigationEnd; track item.path) {
+    <a
+      class="bottom-nav__link"
+      [routerLink]="item.path"
+      routerLinkActive="bottom-nav__link--active"
+      [routerLinkActiveOptions]="{ exact: item.exact }"
+      ariaCurrentWhenActive="page"
+    >
+      <app-icon [name]="item.icon" />
+      {{ item.label }}
+    </a>
+  }
+</nav>
+
+<app-snackbar />

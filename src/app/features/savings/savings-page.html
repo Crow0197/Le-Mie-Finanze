@@ -1,0 +1,215 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Risparmio</h1>
+      <p class="page-header__subtitle">Previsioni, obiettivi e budget. Nessun consiglio d'investimento: solo i tuoi numeri.</p>
+    </div>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert--danger" role="alert">{{ message }}</p>
+  }
+
+  <section class="card section" aria-labelledby="forecast-title">
+    <div class="section__header">
+      <h2 id="forecast-title">Previsione</h2>
+      <app-info-hint
+        label="Previsione"
+        text="Saldo totale attuale più le entrate e meno le spese pianificate e ricorrenti fino alla data scelta. I trasferimenti tra conti non cambiano il totale."
+      />
+    </div>
+    <div class="toolbar">
+      <div class="field">
+        <label class="field__label" for="forecast-date">Fino al</label>
+        <input
+          id="forecast-date"
+          class="field__control"
+          type="date"
+          [min]="today"
+          [ngModel]="targetDate()"
+          (ngModelChange)="targetDate.set($event)"
+        />
+      </div>
+    </div>
+    @if (loading()) {
+      <app-skeleton height="64px" />
+    } @else if (forecast(); as result) {
+      <div class="grid grid--2">
+        <div class="stat">
+          <p class="stat__label">
+            Saldo totale previsto al {{ targetDate() | localDate }}
+            <app-info-hint
+              label="Saldo totale previsto"
+              text="Quanto avrai in totale su tutti i conti a questa data, sommando le entrate e sottraendo le spese già previste."
+            />
+          </p>
+          <p class="stat__value amount" [class.amount--negative]="result.balanceCents < 0">{{ result.balanceCents | money }}</p>
+        </div>
+        <div class="stat">
+          <p class="stat__label">
+            Risparmio netto da oggi al {{ targetDate() | localDate }}
+            <app-info-hint
+              label="Risparmio netto"
+              text="La differenza tra quanto entrerà e quanto uscirà da qui alla data scelta. Se è negativo, in questo periodo prevedi di spendere più di quanto guadagni."
+            />
+          </p>
+          <p class="stat__value amount" [class.amount--negative]="result.savings.netCents < 0">{{ result.savings.netCents | money }}</p>
+          <p class="muted">
+            Entrate previste +{{ result.savings.incomeCents | money }} · Spese previste −{{ result.savings.expenseCents | money }}
+          </p>
+        </div>
+      </div>
+    } @else {
+      <p class="muted">Scegli una data a partire da oggi.</p>
+    }
+  </section>
+
+  <section class="section" aria-labelledby="goals-title">
+    <div class="section__header">
+      <h2 id="goals-title">
+        Obiettivi di risparmio
+        <app-info-hint
+          label="Obiettivi di risparmio"
+          text="Ogni obiettivo mostra quanto hai già messo da parte rispetto al traguardo: se è collegato a un conto guarda il saldo di quel conto, altrimenti il totale di tutti i conti. La stima dei tempi si basa sul risparmio previsto di questo mese."
+        />
+      </h2>
+      <button type="button" class="button button--secondary button--small" (click)="openGoalForm()">
+        <app-icon name="plus" [size]="16" />
+        Nuovo obiettivo
+      </button>
+    </div>
+    @if (loading()) {
+      <div class="card"><app-skeleton height="64px" /></div>
+    } @else if (goalViews().length === 0) {
+      <div class="card">
+        <app-empty-state
+          icon="target"
+          heading="Nessun obiettivo"
+          description="Imposta un traguardo, come un fondo emergenze o una vacanza, e segui l'avanzamento."
+        />
+      </div>
+    } @else {
+      <div class="grid grid--2">
+        @for (view of goalViews(); track view.goal.id) {
+          <article class="card goal" [class.goal--completed]="view.completed">
+            <div class="section__header">
+              <h3 class="goal__name">
+                @if (view.completed) {
+                  <app-icon name="sparkles" [size]="18" />
+                }
+                {{ view.goal.name }}
+              </h3>
+              <div class="list-item__actions">
+                <button type="button" class="icon-button" [attr.aria-label]="'Modifica ' + view.goal.name" (click)="openGoalForm(view.goal)">
+                  <app-icon name="pencil" [size]="18" />
+                </button>
+                <button type="button" class="icon-button" [attr.aria-label]="'Archivia ' + view.goal.name" [disabled]="busy()" (click)="archiveGoal(view.goal)">
+                  <app-icon name="archive" [size]="18" />
+                </button>
+              </div>
+            </div>
+            <p>
+              <strong class="amount">{{ view.currentCents | money }}</strong>
+              <span class="muted"> di {{ view.goal.targetAmountCents | money }} · {{ view.percent }}%</span>
+            </p>
+            <div
+              class="progress"
+              role="progressbar"
+              [attr.aria-valuenow]="view.percent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-label]="'Avanzamento ' + view.goal.name"
+            >
+              <div class="progress__bar" [style.width.%]="view.percent"></div>
+            </div>
+            <p class="muted">
+              {{ view.estimate }}
+              @if (view.goal.targetDate) {
+                Scadenza: {{ view.goal.targetDate | localDate }}.
+              }
+            </p>
+          </article>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="card section" aria-labelledby="budgets-title">
+    <div class="section__header">
+      <h2 id="budgets-title">
+        Budget mensili
+        <app-info-hint
+          label="Budget mensili"
+          text="Confrontano le spese confermate del mese con un limite che scegli tu. Sopra l'80% del limite l'app te lo segnala, sopra il 100% è superato."
+        />
+      </h2>
+      <div class="month-switch">
+        <button type="button" class="icon-button" aria-label="Mese precedente" (click)="changeMonth(-1)">
+          <app-icon name="arrow-up" [size]="18" class="rotate-left" />
+        </button>
+        <strong class="month-switch__label">{{ month() | localDate: 'month' }}</strong>
+        <button type="button" class="icon-button" aria-label="Mese successivo" (click)="changeMonth(1)">
+          <app-icon name="arrow-down" [size]="18" class="rotate-left" />
+        </button>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <app-skeleton height="48px" />
+    } @else if (budgetViews().length === 0) {
+      <p class="muted">Nessun budget per questo mese.</p>
+    } @else {
+      <ul class="list">
+        @for (view of budgetViews(); track view.budget.id) {
+          <li class="budget">
+            <button type="button" class="budget__button" (click)="openBudgetForm(view.budget)">
+              <span class="budget__header">
+                <strong>{{ view.name }}</strong>
+                <span class="amount">{{ view.usage.usedCents | money }} / {{ view.budget.limitCents | money }}</span>
+              </span>
+              <span
+                class="progress"
+                role="progressbar"
+                [attr.aria-valuenow]="view.usage.percent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-label]="'Budget usato ' + view.name"
+              >
+                <span
+                  class="progress__bar"
+                  [class.progress__bar--warning]="view.usage.level === 'warning'"
+                  [class.progress__bar--danger]="view.usage.level === 'over'"
+                  [style.width.%]="view.usage.percent > 100 ? 100 : view.usage.percent"
+                ></span>
+              </span>
+              <span class="budget__footer muted">
+                {{ view.usage.percent }}% usato ·
+                @if (view.usage.remainingCents >= 0) {
+                  restano {{ view.usage.remainingCents | money }}
+                } @else {
+                  superato di {{ -view.usage.remainingCents | money }}
+                }
+                @if (view.usage.level === 'warning') {
+                  <span class="badge badge--warning"><app-icon name="triangle-alert" [size]="12" /> Oltre l'80%</span>
+                } @else if (view.usage.level === 'over') {
+                  <span class="badge badge--danger"><app-icon name="circle-alert" [size]="12" /> Superato</span>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="toolbar">
+      <button type="button" class="button button--secondary button--small" (click)="openBudgetForm()">
+        <app-icon name="plus" [size]="16" />
+        Aggiungi budget
+      </button>
+      <button type="button" class="button button--ghost button--small" [disabled]="busy()" (click)="copyPreviousBudgets()">
+        <app-icon name="copy" [size]="16" />
+        Copia dal mese precedente
+      </button>
+    </div>
+  </section>
+</section>
