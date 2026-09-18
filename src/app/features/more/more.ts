@@ -1,19 +1,15 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { APP_INFO } from '../../core/app-info';
 import { AuthService } from '../../core/auth/auth.service';
 import { getFirebaseErrorMessage } from '../../core/error-handling/firebase-error-message';
+import { NavigationService } from '../../core/state/navigation.service';
 import { UserDataStore } from '../../core/state/user-data.store';
 import { ViewPeriodService } from '../../core/state/view-period.service';
 import { VIEW_PERIOD_LABELS, ViewPeriodPreset } from '../../domain/models/user-settings';
-import { Icon, IconName } from '../../shared/ui/icon/icon';
+import { Icon } from '../../shared/ui/icon/icon';
 import { SnackbarService } from '../../shared/ui/snackbar/snackbar.service';
-
-interface MoreLink {
-  path: string;
-  label: string;
-  icon: IconName;
-}
 
 @Component({
   selector: 'app-more',
@@ -26,7 +22,9 @@ export class More {
   private readonly store = inject(UserDataStore);
   private readonly snackbar = inject(SnackbarService);
   protected readonly viewPeriod = inject(ViewPeriodService);
+  protected readonly navigation = inject(NavigationService);
 
+  protected readonly appVersion = APP_INFO.version;
   protected readonly user = this.authService.user;
   protected readonly displayName = computed(() => this.store.settings()?.displayName || this.user()?.displayName || 'Profilo');
   protected readonly presets = Object.keys(VIEW_PERIOD_LABELS) as ViewPeriodPreset[];
@@ -35,13 +33,6 @@ export class More {
   protected readonly startDate = signal('');
   protected readonly endDate = signal('');
   protected readonly saving = signal(false);
-
-  protected readonly links: readonly MoreLink[] = [
-    { path: '/resoconto', label: 'Resoconto', icon: 'chart-column' },
-    { path: '/conti', label: 'Conti', icon: 'landmark' },
-    { path: '/pianificate', label: 'Pianificate', icon: 'calendar-clock' },
-    { path: '/amministrazione', label: 'Amministrazione', icon: 'settings' },
-  ];
 
   constructor() {
     effect(() => {

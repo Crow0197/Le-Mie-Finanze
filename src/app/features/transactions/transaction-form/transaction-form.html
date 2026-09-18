@@ -41,6 +41,14 @@
     }
   </div>
 
+  @if (bufferWarning(); as warning) {
+    <p class="alert alert--warning" role="status">
+      <app-icon name="triangle-alert" [size]="18" />
+      Dopo questa spesa ti resterebbero {{ warning.remainingCents | money }}, sotto il margine di sicurezza di
+      {{ warning.bufferCents | money }} che vuoi tenere da parte.
+    </p>
+  }
+
   <div class="field-row">
     <div class="field">
       <label class="field__label" for="transaction-account">
