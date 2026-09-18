@@ -25,53 +25,14 @@
       <app-skeleton height="180px" />
     </div>
   } @else if (!errorMessage()) {
-    <section class="card section" aria-labelledby="simulation-verdict-title">
+    <section class="card section" aria-labelledby="simulation-scenario-title">
       <div class="section__header">
-        <h2 id="simulation-verdict-title">Rischi di andare in rosso?</h2>
-        <app-info-hint
-          label="Come funziona"
-          text="Parto dal saldo di oggi dei conti inclusi nel saldo totale e vado avanti giorno per giorno: aggiungo stipendi ed entrate ricorrenti, tolgo rate, spese fisse e operazioni già pianificate. Quello che scrivi qui sotto si aggiunge a tutto questo."
-        />
+        <h2 id="simulation-scenario-title">Cosa vuoi provare</h2>
+        <button type="button" class="button button--secondary button--small" [disabled]="!hasScenario()" (click)="reset()">
+          Azzera
+        </button>
       </div>
-
-      <div
-        class="alert sim-verdict"
-        role="status"
-        [class.alert--success]="risk().level === 'ok'"
-        [class.alert--warning]="risk().level === 'warning'"
-        [class.alert--danger]="risk().level === 'danger'"
-      >
-        <app-icon [name]="risk().level === 'ok' ? 'circle-check' : 'triangle-alert'" [size]="28" />
-        <div>
-          @switch (risk().level) {
-            @case ('danger') {
-              <p class="sim-verdict__title">Vai sotto zero il {{ risk().firstNegativeDate | localDate }}</p>
-              <p>
-                Il momento peggiore è il {{ risk().minDate | localDate }}: ti mancherebbero
-                {{ risk().missingCents | money }}.
-              </p>
-            }
-            @case ('warning') {
-              <p class="sim-verdict__title">Non vai sotto zero, ma ci passi vicino</p>
-              <p>
-                Il {{ risk().minDate | localDate }} resteresti con {{ risk().minCents | money }}:
-                {{ risk().missingCents | money }} sotto il margine di sicurezza di {{ risk().bufferCents | money }}.
-              </p>
-            }
-            @default {
-              <p class="sim-verdict__title">Non vai mai sotto zero</p>
-              <p>Il momento più basso è il {{ risk().minDate | localDate }}, con {{ risk().minCents | money }}.</p>
-            }
-          }
-          <p class="sim-verdict__note">
-            {{
-              hasScenario()
-                ? 'Con quello che hai già in programma più la simulazione qui sotto'
-                : 'Con gli stipendi, le rate e le spese fisse che hai già'
-            }}, dal {{ today | localDate }} al {{ endDate() | localDate }}.
-          </p>
-        </div>
-      </div>
+      <p class="muted">Compila solo quello che ti interessa: i campi si possono anche combinare.</p>
 
       <div class="sim-horizon">
         <span class="field__label" id="simulation-horizon-label">Guarda avanti</span>
@@ -88,16 +49,6 @@
           }
         </div>
       </div>
-    </section>
-
-    <section class="card section" aria-labelledby="simulation-scenario-title">
-      <div class="section__header">
-        <h2 id="simulation-scenario-title">Cosa vuoi provare</h2>
-        <button type="button" class="button button--secondary button--small" [disabled]="!hasScenario()" (click)="reset()">
-          Azzera
-        </button>
-      </div>
-      <p class="muted">Compila solo quello che ti interessa: i campi si possono anche combinare.</p>
 
       <div class="sim-blocks">
         <div class="sim-block">
@@ -236,6 +187,55 @@
               (ngModelChange)="salaryChangeAmount.set($event)"
             />
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section" aria-labelledby="simulation-verdict-title">
+      <div class="section__header">
+        <h2 id="simulation-verdict-title">Rischi di andare in rosso?</h2>
+        <app-info-hint
+          label="Come funziona"
+          text="Parto dal saldo di oggi dei conti inclusi nel saldo totale e vado avanti giorno per giorno: aggiungo stipendi ed entrate ricorrenti, tolgo rate, spese fisse e operazioni già pianificate. Quello che scrivi qui sopra si aggiunge a tutto questo."
+        />
+      </div>
+
+      <div
+        class="alert sim-verdict"
+        role="status"
+        [class.alert--success]="risk().level === 'ok'"
+        [class.alert--warning]="risk().level === 'warning'"
+        [class.alert--danger]="risk().level === 'danger'"
+      >
+        <app-icon [name]="risk().level === 'ok' ? 'circle-check' : 'triangle-alert'" [size]="28" />
+        <div>
+          @switch (risk().level) {
+            @case ('danger') {
+              <p class="sim-verdict__title">Vai sotto zero il {{ risk().firstNegativeDate | localDate }}</p>
+              <p>
+                Il momento peggiore è il {{ risk().minDate | localDate }}: ti mancherebbero
+                {{ risk().missingCents | money }}.
+              </p>
+            }
+            @case ('warning') {
+              <p class="sim-verdict__title">Non vai sotto zero, ma ci passi vicino</p>
+              <p>
+                Il {{ risk().minDate | localDate }} resteresti con {{ risk().minCents | money }}:
+                {{ risk().missingCents | money }} sotto il margine di sicurezza di {{ risk().bufferCents | money }}.
+              </p>
+            }
+            @default {
+              <p class="sim-verdict__title">Non vai mai sotto zero</p>
+              <p>Il momento più basso è il {{ risk().minDate | localDate }}, con {{ risk().minCents | money }}.</p>
+            }
+          }
+          <p class="sim-verdict__note">
+            {{
+              hasScenario()
+                ? 'Con quello che hai già in programma più la simulazione qui sopra'
+                : 'Con gli stipendi, le rate e le spese fisse che hai già'
+            }}, dal {{ today | localDate }} al {{ endDate() | localDate }}.
+          </p>
         </div>
       </div>
     </section>
