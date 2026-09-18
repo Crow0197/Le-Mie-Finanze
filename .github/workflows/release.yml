@@ -13,13 +13,22 @@ on:
           - patch
           - minor
           - major
+  workflow_call:
+    inputs:
+      tipo:
+        description: Tipo di rilascio
+        required: true
+        type: string
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
@@ -61,3 +70,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create v${{ steps.versione.outputs.versione }} --target release/v${{ steps.versione.outputs.versione }} --title "v${{ steps.versione.outputs.versione }}" --generate-notes
+
+      # Allinea regole e indici Firestore al codice appena pubblicato.
+      # Se fallisce per permessi: nella console Google Cloud dare al service account del deploy
+      # i ruoli "Firebase Rules Admin" e "Cloud Datastore Index Admin".
+      - name: Pubblica regole e indici Firestore
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LE_MIE_FINANZE_9280F }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-key.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-key.json"
+          npx --yes firebase-tools deploy --only firestore --project le-mie-finanze-9280f --non-interactive
+
+      - name: Controllo qualità e PWA
+        continue-on-error: true
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: https://le-mie-finanze-9280f.web.app/
+          uploadArtifacts: true
+
+      - name: Avviso su Telegram
+        if: always() && env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            TESTO="Pubblicata la versione ${{ steps.versione.outputs.versione }}: https://le-mie-finanze-9280f.web.app"
+          else
+            TESTO="Rilascio non riuscito: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode "text=$TESTO" > /dev/null
