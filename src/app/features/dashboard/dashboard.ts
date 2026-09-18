@@ -13,6 +13,7 @@ import {
   todayInTimeZone,
 } from '../../domain/dates/local-date';
 import { calculateAvailableCents, calculateNetWorthCents } from '../../domain/forecast/balances';
+import { resolveSalaryCycleRange } from '../../domain/forecast/salary-cycle';
 import {
   buildVirtualOccurrences,
   calculateAvailableUntilSalary,
@@ -67,6 +68,8 @@ export class Dashboard {
   private readonly recent = signal<Transaction[]>([]);
   private readonly planned = signal<Transaction[]>([]);
   private readonly monthTransactions = signal<Transaction[]>([]);
+  /** Confirmed transactions from the last salary to today, used for "già speso". */
+  private readonly cycleTransactions = signal<Transaction[]>([]);
 
   protected readonly userName = computed(() => this.store.settings()?.displayName ?? '');
   protected readonly netWorthCents = computed(() => calculateNetWorthCents(this.store.activeAccounts()));
@@ -75,6 +78,14 @@ export class Dashboard {
       .slice(0, 5)
       .map((transaction) => ({ transaction, entry: transactionToListEntry(transaction) })),
   );
+
+  protected readonly netWorthAccounts = computed(() =>
+    this.store.activeAccounts().filter((account) => account.includeInNetWorth),
+  );
+  protected readonly excludedAccounts = computed(() =>
+    this.store.activeAccounts().filter((account) => !account.includeInNetWorth),
+  );
+  protected readonly excludedNames = computed(() => this.excludedAccounts().map((account) => account.name).join(', '));
 
   private readonly salaryRuleIds = computed(
     () => new Set(this.store.rules().filter((rule) => rule.kind === 'salary').map((rule) => rule.id)),
@@ -85,6 +96,17 @@ export class Dashboard {
   private readonly storedKeys = computed(
     () => new Set(this.planned().map((transaction) => transaction.occurrenceKey).filter((key): key is string => !!key)),
   );
+
+  /** From the last salary to the day before the next one; the current month when there is no salary rule. */
+  protected readonly cycle = computed(() => {
+    const today = this.today();
+    const range = resolveSalaryCycleRange(this.store.rules(), today);
+    return {
+      startDate: range?.startDate ?? startOfMonthDate(today),
+      endDate: range?.endDate ?? endOfMonthDate(today),
+      hasSalary: !!range,
+    };
+  });
 
   protected readonly hasSalary = computed(() =>
     this.store.rules().some((rule) => rule.kind === 'salary' && rule.status === 'active'),
@@ -117,6 +139,26 @@ export class Dashboard {
     });
   });
 
+  /** Operations counted by the "until salary" card, so the total can be checked item by item. */
+  protected readonly beforeSalaryItems = computed(() => {
+    const salary = this.nextSalary();
+    if (!salary) {
+      return [];
+    }
+    const today = this.today();
+    return [
+      ...this.plannedEntries().filter((entry) => entry.date < salary.date && !entry.isSalary),
+      ...buildVirtualOccurrences(
+        this.store.rules(),
+        today,
+        addDaysToLocalDate(salary.date, -1),
+        this.storedKeys(),
+      ).filter((entry) => !entry.isSalary),
+    ]
+      .filter((entry) => entry.type !== 'transfer')
+      .sort((a, b) => a.date.localeCompare(b.date));
+  });
+
   protected readonly monthForecast = computed(() => {
     const today = this.today();
     const monthEnd = endOfMonthDate(today);
@@ -135,15 +177,15 @@ export class Dashboard {
   });
 
   /**
-   * How the current balance changes until the end of the month: only what has still to happen is subtracted,
+   * How the current balance changes until the next salary: only what has still to happen is subtracted,
    * because the expenses already registered are part of the balance already.
    */
-  protected readonly monthEnd = computed(() => {
+  protected readonly cycleEnd = computed(() => {
     const today = this.today();
-    const monthEnd = endOfMonthDate(today);
+    const { startDate, endDate } = this.cycle();
     const future = [
-      ...this.plannedEntries().filter((entry) => entry.date > today && entry.date <= monthEnd),
-      ...buildVirtualOccurrences(this.store.rules(), addDaysToLocalDate(today, 1), monthEnd, this.storedKeys()),
+      ...this.plannedEntries().filter((entry) => entry.date > today && entry.date <= endDate),
+      ...buildVirtualOccurrences(this.store.rules(), addDaysToLocalDate(today, 1), endDate, this.storedKeys()),
     ];
     let incomeCents = 0;
     let recurringExpenseCents = 0;
@@ -161,18 +203,26 @@ export class Dashboard {
         otherExpenseCents += entry.feeCents ?? 0;
       }
     }
-    const spentSoFarCents = this.monthTransactions()
+    const items = future.filter((entry) => entry.type !== 'transfer').sort((a, b) => a.date.localeCompare(b.date));
+    const spentSoFarCents = this.cycleTransactions()
       .filter(
-        (transaction) => transaction.status === 'confirmed' && !transaction.deletedAt && transaction.type === 'expense',
+        (transaction) =>
+          transaction.status === 'confirmed' &&
+          !transaction.deletedAt &&
+          transaction.type === 'expense' &&
+          transaction.effectiveDate >= startDate,
       )
       .reduce((total, transaction) => total + transaction.amountCents, 0);
     return {
-      date: monthEnd,
+      startDate,
+      endDate,
+      hasSalary: this.cycle().hasSalary,
       startingCents: this.netWorthCents(),
       incomeCents,
       recurringExpenseCents,
       otherExpenseCents,
       spentSoFarCents,
+      items,
       balanceCents: this.netWorthCents() + incomeCents - recurringExpenseCents - otherExpenseCents,
     };
   });
@@ -223,16 +273,21 @@ export class Dashboard {
     }
     this.errorMessage.set(null);
     try {
-      const [recent, planned, month] = await withTimeout(
+      const cycleStart = this.cycle().startDate;
+      const [recent, planned, month, cycleItems] = await withTimeout(
         Promise.all([
           this.repository.listRecent(uid, 15),
           this.repository.listPlanned(uid),
           this.repository.listRange(uid, { startDate: startOfMonthDate(today), endDate: endOfMonthDate(today) }),
+          cycleStart < startOfMonthDate(today)
+            ? this.repository.listRange(uid, { startDate: cycleStart, endDate: today })
+            : Promise.resolve(null),
         ]),
       );
       this.recent.set(recent.filter((transaction) => !transaction.deletedAt));
       this.planned.set(planned.filter((transaction) => !transaction.deletedAt));
       this.monthTransactions.set(month);
+      this.cycleTransactions.set(cycleItems ?? month);
     } catch (error) {
       this.errorMessage.set(getFirebaseErrorMessage(error));
     } finally {

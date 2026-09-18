@@ -66,6 +66,23 @@
         <p class="stat__value stat__value--hero amount" [class.amount--negative]="netWorthCents() < 0">
           {{ netWorthCents() | money }}
         </p>
+        <ul class="breakdown">
+          @for (account of netWorthAccounts(); track account.id) {
+            <li>
+              <span>{{ account.name }}</span>
+              <strong class="amount" [class.amount--negative]="account.currentBalanceCents < 0">
+                {{ account.currentBalanceCents | money }}
+              </strong>
+            </li>
+          }test
+          @if (excludedAccounts().length > 0) {
+            <li class="breakdown__note">
+              <span>
+                Fuori dal totale: {{ excludedNames() }}
+              </span>
+            </li>
+          }
+        </ul>
       </div>
 
       <div class="card stat stat--wide">
@@ -108,6 +125,19 @@
               <strong class="amount">{{ availability.availableCents | money }}</strong>
             </li>
           </ul>
+          <details class="breakdown__details">
+            <summary>Quali operazioni ho contato</summary>
+            <ul class="breakdown">
+              @for (item of beforeSalaryItems(); track $index) {
+                <li>
+                  <span>{{ item.date | localDate }} · {{ item.description }}</span>
+                  <strong class="amount" [class.amount--positive]="item.type === 'income'">
+                    {{ item.type === 'income' ? '+' : '−' }}{{ item.amountCents | money }}
+                  </strong>
+                </li>
+              }
+            </ul>
+          </details>
         } @else {
           <p class="muted">Configura lo stipendio per sapere quanto puoi spendere fino al prossimo accredito.</p>
           <a class="button button--secondary button--small dashboard__cta" routerLink="/pianificate">Configura stipendio</a>
@@ -116,45 +146,62 @@
 
       <div class="card stat">
         <p class="stat__label">
-          A fine mese ti resterebbero
+          {{ cycleEnd().hasSalary ? 'Prima del prossimo stipendio' : 'A fine mese' }} ti resterebbero
           <app-info-hint
-            label="A fine mese ti resterebbero"
-            text="Parte dal saldo di oggi e toglie solo quello che deve ancora succedere entro fine mese: rate, abbonamenti e altre operazioni già programmate. Le spese che hai già fatto sono dentro il saldo di oggi, quindi non vengono tolte due volte."
+            label="Quanto ti resta prima del prossimo stipendio"
+            text="Parte dal saldo di oggi e toglie tutto quello che deve ancora succedere prima del prossimo accredito: rate, abbonamenti e altre operazioni già programmate. Le spese che hai già fatto sono dentro il saldo di oggi, quindi non vengono tolte due volte."
           />
         </p>
-        <p class="stat__value amount" [class.amount--negative]="monthEnd().balanceCents < 0">
-          {{ monthEnd().balanceCents | money }}
+        <p class="stat__value amount" [class.amount--negative]="cycleEnd().balanceCents < 0">
+          {{ cycleEnd().balanceCents | money }}
         </p>
-        <p class="muted">sui conti il {{ monthEnd().date | localDate }}</p>
+        <p class="muted">sui conti il {{ cycleEnd().endDate | localDate }}</p>
         <ul class="breakdown">
           <li>
             <span>Saldo di oggi</span>
-            <strong class="amount">{{ monthEnd().startingCents | money }}</strong>
+            <strong class="amount">{{ cycleEnd().startingCents | money }}</strong>
           </li>
-          @if (monthEnd().incomeCents > 0) {
+          @if (cycleEnd().incomeCents > 0) {
             <li>
               <span>Entrate ancora in arrivo</span>
-              <strong class="amount amount--positive">+{{ monthEnd().incomeCents | money }}</strong>
+              <strong class="amount amount--positive">+{{ cycleEnd().incomeCents | money }}</strong>
             </li>
           }
           <li>
             <span>Rate e abbonamenti da pagare</span>
-            <strong class="amount amount--negative">−{{ monthEnd().recurringExpenseCents | money }}</strong>
+            <strong class="amount amount--negative">−{{ cycleEnd().recurringExpenseCents | money }}</strong>
           </li>
-          @if (monthEnd().otherExpenseCents > 0) {
+          @if (cycleEnd().otherExpenseCents > 0) {
             <li>
               <span>Altre spese già programmate</span>
-              <strong class="amount amount--negative">−{{ monthEnd().otherExpenseCents | money }}</strong>
+              <strong class="amount amount--negative">−{{ cycleEnd().otherExpenseCents | money }}</strong>
             </li>
           }
           <li class="breakdown__total">
             <span>Ti resterebbero</span>
-            <strong class="amount">{{ monthEnd().balanceCents | money }}</strong>
+            <strong class="amount">{{ cycleEnd().balanceCents | money }}</strong>
           </li>
         </ul>
+        <details class="breakdown__details">
+          <summary>Quali scadenze ci sono da qui al {{ cycleEnd().endDate | localDate }}</summary>
+          @if (cycleEnd().items.length === 0) {
+            <p class="muted">Nessuna scadenza prima del prossimo stipendio.</p>
+          } @else {
+            <ul class="breakdown">
+              @for (item of cycleEnd().items; track $index) {
+                <li>
+                  <span>{{ item.date | localDate }} · {{ item.description }}</span>
+                  <strong class="amount" [class.amount--positive]="item.type === 'income'">
+                    {{ item.type === 'income' ? '+' : '−' }}{{ item.amountCents | money }}
+                  </strong>
+                </li>
+              }
+            </ul>
+          }
+        </details>
         <p class="muted">
-          Questo mese hai già speso {{ monthEnd().spentSoFarCents | money }}, già tolti dal saldo di oggi. Risparmio del mese
-          previsto: {{ monthForecast().netCents | money }}.
+          Dal {{ cycleEnd().startDate | localDate }} hai già speso {{ cycleEnd().spentSoFarCents | money }}, già tolti dal
+          saldo di oggi. Risparmio previsto nel mese di calendario: {{ monthForecast().netCents | money }}.
         </p>
       </div>
     </div>
