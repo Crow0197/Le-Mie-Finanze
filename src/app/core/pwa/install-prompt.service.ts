@@ -73,7 +73,9 @@ export class InstallPromptService {
 
   private isStandalone(): boolean {
     const navigatorWithStandalone = this.window?.navigator as (Navigator & { standalone?: boolean }) | undefined;
-    return !!this.window?.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone?.standalone === true;
+    // matchMedia non esiste in ogni ambiente (per esempio nei test): senza risposta si assume browser normale.
+    const standaloneMedia = this.window?.matchMedia?.('(display-mode: standalone)');
+    return standaloneMedia?.matches === true || navigatorWithStandalone?.standalone === true;
   }
 
   private isIos(): boolean {

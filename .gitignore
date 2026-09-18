@@ -44,6 +44,9 @@ __screenshots__/
 firebase-debug.log*
 firestore-debug.log*
 
+# Documenti personali, fuori dal repo
+PROJECT_SPEC.md
+
 # System files
 .DS_Store
 Thumbs.db
