@@ -56,3 +56,22 @@
 .dashboard__period-link {
   white-space: nowrap;
 }
+
+.breakdown__details {
+  font-size: var(--font-size-sm);
+
+  summary {
+    color: var(--color-primary);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .breakdown {
+    margin-top: var(--space-2);
+  }
+}
+
+.breakdown__note {
+  padding-top: var(--space-1);
+  font-size: var(--font-size-xs);
+}
