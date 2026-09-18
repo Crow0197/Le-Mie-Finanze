@@ -1,0 +1,226 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Pianificate</h1>
+      <p class="page-header__subtitle">Stipendio, entrate e spese ricorrenti, operazioni da confermare.</p>
+    </div>
+    <button type="button" class="button button--primary" (click)="openRuleForm('standard')">
+      <app-icon name="plus" />
+      Nuova ricorrenza
+    </button>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert--danger" role="alert">{{ message }}</p>
+  }
+
+  <section class="card section" aria-labelledby="salary-title">
+    <div class="section__header">
+      <h2 id="salary-title">Stipendio</h2>
+      @if (salaryRules().length > 0) {
+        <button type="button" class="button button--ghost button--small" (click)="openRuleForm('salary')">
+          <app-icon name="plus" [size]="16" />
+          Aggiungi
+        </button>
+      }
+    </div>
+    @if (!store.loaded()) {
+      <app-skeleton height="48px" />
+    } @else if (salaryRules().length === 0) {
+      <app-empty-state
+        icon="briefcase"
+        heading="Stipendio non configurato"
+        description="Indica importo e giorno di accredito per calcolare quanto puoi spendere fino al prossimo stipendio."
+      >
+        <button type="button" class="button button--secondary" (click)="openRuleForm('salary')">Configura stipendio</button>
+      </app-empty-state>
+    } @else {
+      <ul class="list">
+        @for (rule of salaryRules(); track rule.id) {
+          <li class="list-item">
+            <span class="item-icon"><app-icon name="briefcase" /></span>
+            <div class="list-item__main">
+              <strong>{{ rule.amountCents | money }} · giorno {{ rule.dayOfMonth }}</strong>
+              <span>
+                {{ accountName(rule) }} ·
+                {{ rule.status === 'active' ? 'prossimo ' + (rule.nextOccurrenceDate | localDate) : 'sospeso' }} ·
+                {{ rule.autoPost ? 'automatico' : 'da confermare' }}
+              </span>
+            </div>
+            <div class="list-item__actions">
+              <button type="button" class="icon-button" aria-label="Modifica stipendio" (click)="openRuleForm('salary', rule)">
+                <app-icon name="pencil" [size]="18" />
+              </button>
+              @if (rule.status === 'active') {
+                <button type="button" class="icon-button" aria-label="Sospendi stipendio" [disabled]="busy()" (click)="pause(rule)">
+                  <app-icon name="pause" [size]="18" />
+                </button>
+              } @else if (rule.pausedReason !== 'accountArchived') {
+                <button type="button" class="icon-button" aria-label="Riattiva stipendio" [disabled]="busy()" (click)="resume(rule)">
+                  <app-icon name="play" [size]="18" />
+                </button>
+              }
+              <button type="button" class="icon-button" aria-label="Elimina stipendio" [disabled]="busy()" (click)="removeRule(rule)">
+                <app-icon name="trash" [size]="18" />
+              </button>
+            </div>
+          </li>
+          @if (rule.pausedReason === 'accountArchived') {
+            <li>
+              <ng-container *ngTemplateOutlet="accountReplacement; context: { $implicit: rule }" />
+            </li>
+          }
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="card section" aria-labelledby="due-title">
+    <h2 id="due-title">Da confermare</h2>
+    @if (loading()) {
+      <app-skeleton height="48px" />
+    } @else if (due().length === 0) {
+      <p class="muted">Nessuna operazione in attesa di conferma.</p>
+    } @else {
+      <ul class="list">
+        @for (item of due(); track item.transaction.id) {
+          <li class="list-item due-item">
+            <app-transaction-item [entry]="item.entry" />
+            <div class="list-item__actions">
+              <button type="button" class="button button--primary button--small" [disabled]="busy()" (click)="confirm(item.transaction)">
+                <app-icon name="check" [size]="16" />
+                Conferma
+              </button>
+              <button type="button" class="icon-button" aria-label="Elimina operazione pianificata" (click)="remove(item.transaction)">
+                <app-icon name="trash" [size]="18" />
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="card section" aria-labelledby="rules-title">
+    <h2 id="rules-title">Ricorrenze</h2>
+    @if (store.loaded() && otherRules().length === 0) {
+      <p class="muted">Nessuna ricorrenza. Aggiungi affitto, bollette o abbonamenti per vederli nelle previsioni.</p>
+    } @else {
+      <ul class="list">
+        @for (rule of otherRules(); track rule.id) {
+          <li class="list-item" [class.rule--inactive]="rule.status !== 'active'">
+            <span class="item-icon">
+              <app-icon [name]="rule.transactionType === 'income' ? 'trending-up' : 'trending-down'" />
+            </span>
+            <div class="list-item__main">
+              <strong>{{ rule.name }}</strong>
+              <span>
+                {{ rule.transactionType === 'income' ? '+' : '−' }}{{ rule.amountCents | money }} · {{ scheduleLabel(rule) }} ·
+                {{ accountName(rule) }}
+              </span>
+              <span>
+                @switch (rule.status) {
+                  @case ('active') {
+                    <span class="badge badge--primary">Attiva</span> prossima {{ rule.nextOccurrenceDate | localDate }}
+                  }
+                  @case ('paused') {
+                    <span class="badge badge--warning">Sospesa</span>
+                  }
+                  @case ('completed') {
+                    <span class="badge">Conclusa</span>
+                  }
+                }
+              </span>
+            </div>
+            <div class="list-item__actions">
+              @if (rule.status !== 'completed') {
+                <button type="button" class="icon-button" [attr.aria-label]="'Modifica ' + rule.name" (click)="openRuleForm('standard', rule)">
+                  <app-icon name="pencil" [size]="18" />
+                </button>
+              }
+              @if (rule.status === 'active') {
+                <button type="button" class="icon-button" [attr.aria-label]="'Sospendi ' + rule.name" [disabled]="busy()" (click)="pause(rule)">
+                  <app-icon name="pause" [size]="18" />
+                </button>
+              } @else if (rule.status === 'paused' && rule.pausedReason !== 'accountArchived') {
+                <button type="button" class="icon-button" [attr.aria-label]="'Riattiva ' + rule.name" [disabled]="busy()" (click)="resume(rule)">
+                  <app-icon name="play" [size]="18" />
+                </button>
+              }
+              @if (rule.status !== 'completed') {
+                <button type="button" class="icon-button" [attr.aria-label]="'Concludi ' + rule.name" [disabled]="busy()" (click)="complete(rule)">
+                  <app-icon name="circle-check" [size]="18" />
+                </button>
+              }
+              <button type="button" class="icon-button" [attr.aria-label]="'Elimina ' + rule.name" [disabled]="busy()" (click)="removeRule(rule)">
+                <app-icon name="trash" [size]="18" />
+              </button>
+            </div>
+          </li>
+          @if (rule.pausedReason === 'accountArchived' && rule.status === 'paused') {
+            <li>
+              <ng-container *ngTemplateOutlet="accountReplacement; context: { $implicit: rule }" />
+            </li>
+          }
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="card section" aria-labelledby="upcoming-title">
+    <h2 id="upcoming-title">Prossimi 60 giorni</h2>
+    @if (upcoming().length === 0) {
+      <p class="muted">Nessuna operazione prevista.</p>
+    } @else {
+      <p class="muted">
+        Entrate previste <strong class="amount amount--positive">+{{ upcomingSummary().incomeCents | money }}</strong> ·
+        Spese previste <strong class="amount amount--negative">−{{ upcomingSummary().expenseCents | money }}</strong> ·
+        Netto
+        <strong class="amount" [class.amount--negative]="upcomingSummary().netCents < 0">
+          {{ upcomingSummary().netCents | money }}
+        </strong>
+      </p>
+      <ul class="list">
+        @for (entry of upcoming(); track $index) {
+          <li class="list-item"><app-transaction-item [entry]="entry" /></li>
+        }
+      </ul>
+    }
+  </section>
+</section>
+
+<ng-template #accountReplacement let-rule>
+  <div class="alert alert--warning replacement" role="status">
+    <app-icon name="triangle-alert" />
+    <div class="replacement__body">
+      <p>
+        <strong>{{ rule.name }}</strong> è sospesa perché il conto è stato archiviato. Scegli un nuovo conto attivo e
+        riattivala: non uso il conto predefinito per evitare addebiti indesiderati.
+      </p>
+      <div class="toolbar">
+        <div class="field">
+          <label class="field__label" [for]="'replacement-' + rule.id">Nuovo conto</label>
+          <select
+            class="field__control"
+            [id]="'replacement-' + rule.id"
+            [ngModel]="replacementAccounts()[rule.id] ?? ''"
+            (ngModelChange)="setReplacement(rule.id, $event)"
+          >
+            <option value="" disabled>Seleziona un conto</option>
+            @for (account of store.activeAccounts(); track account.id) {
+              <option [value]="account.id">{{ account.name }}</option>
+            }
+          </select>
+        </div>
+        <button
+          type="button"
+          class="button button--primary button--small"
+          [disabled]="busy() || !replacementAccounts()[rule.id]"
+          (click)="resume(rule)"
+        >
+          Riattiva
+        </button>
+      </div>
+    </div>
+  </div>
+</ng-template>

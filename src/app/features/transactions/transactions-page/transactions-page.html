@@ -1,0 +1,153 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Movimenti</h1>
+      <p class="page-header__subtitle">
+        Periodo: {{ startDate() || endDate() ? (startDate() | localDate) + ' – ' + (endDate() | localDate) : 'tutto' }}
+      </p>
+    </div>
+  </header>
+
+  <details class="card filters" [open]="hasFilters()">
+    <summary class="filters__summary">
+      <app-icon name="funnel" [size]="18" />
+      Filtri e ricerca
+      @if (hasFilters()) {
+        <span class="badge badge--primary">Attivi</span>
+      }
+    </summary>
+    <div class="filters__body">
+      <div class="field">
+        <label class="field__label" for="filter-search">Cerca</label>
+        <input
+          id="filter-search"
+          class="field__control"
+          type="search"
+          placeholder="Descrizione o note"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+        />
+      </div>
+      <div class="toolbar">
+        <div class="field">
+          <label class="field__label" for="filter-start">Dal</label>
+          <input id="filter-start" class="field__control" type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+        </div>
+        <div class="field">
+          <label class="field__label" for="filter-end">Al</label>
+          <input id="filter-end" class="field__control" type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+        </div>
+        <div class="field">
+          <label class="field__label" for="filter-type">Tipo</label>
+          <select id="filter-type" class="field__control" [ngModel]="type()" (ngModelChange)="type.set($event)">
+            <option value="">Tutti</option>
+            @for (option of types; track option) {
+              <option [value]="option">{{ typeLabels[option] }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="filter-account">Conto</label>
+          <select id="filter-account" class="field__control" [ngModel]="accountId()" (ngModelChange)="accountId.set($event)">
+            <option value="">Tutti</option>
+            @for (account of store.accounts(); track account.id) {
+              <option [value]="account.id">{{ account.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="filter-category">Categoria</label>
+          <select id="filter-category" class="field__control" [ngModel]="categoryId()" (ngModelChange)="categoryId.set($event)">
+            <option value="">Tutte</option>
+            @for (group of categoryGroups(); track group.macro.id) {
+              <option [value]="group.macro.id">{{ group.macro.name }}</option>
+              @for (child of group.children; track child.id) {
+                <option [value]="child.id">— {{ child.name }}</option>
+              }
+            }
+          </select>
+        </div>
+      </div>
+      <button type="button" class="button button--ghost button--small details-toggle" (click)="resetFilters()">
+        Azzera filtri
+      </button>
+    </div>
+  </details>
+
+  <div class="card totals" aria-live="polite">
+    <p>
+      <span class="muted">Entrate</span>
+      <strong class="amount amount--positive">+{{ totals().incomeCents | money }}</strong>
+    </p>
+    <p>
+      <span class="muted">Spese</span>
+      <strong class="amount amount--negative">−{{ totals().expenseCents | money }}</strong>
+    </p>
+    <p>
+      <span class="muted">Netto</span>
+      <strong class="amount" [class.amount--negative]="totals().netCents < 0">{{ totals().netCents | money }}</strong>
+    </p>
+    @if (hasMore()) {
+      <p class="totals__note muted">Totali calcolati sui movimenti caricati. Carica gli altri per includerli.</p>
+    }
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="alert alert--danger" role="alert">
+      <app-icon name="circle-alert" />
+      <div>
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="card section" aria-busy="true">
+      <span class="visually-hidden">Caricamento dei movimenti in corso</span>
+      <app-skeleton height="48px" />
+      <app-skeleton height="48px" />
+      <app-skeleton height="48px" />
+    </div>
+  } @else if (groups().length === 0) {
+    <div class="card">
+      <app-empty-state
+        icon="list"
+        [heading]="hasFilters() ? 'Nessun movimento trovato' : 'Nessun movimento nel periodo'"
+        [description]="hasFilters() ? 'Prova a cambiare o azzerare i filtri.' : 'Registra una spesa o un\'entrata con il pulsante Nuova operazione.'"
+      >
+        @if (hasFilters()) {
+          <button type="button" class="button button--secondary" (click)="resetFilters()">Azzera filtri</button>
+        }
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="card day-groups">
+      @for (group of groups(); track group.date) {
+        <section class="day-group" [attr.aria-label]="group.date | localDate: 'long'">
+          <h2 class="day-group__title">{{ group.date | localDate: 'long' }}</h2>
+          <ul class="list">
+            @for (item of group.items; track item.transaction.id) {
+              <li animate.enter="list-enter">
+                <button
+                  type="button"
+                  class="list-item list-item--button"
+                  [class.list-item--highlight]="transactionActions.lastChangedId() === item.transaction.id"
+                  (click)="open(item.transaction)"
+                >
+                  <app-transaction-item [entry]="item.entry" [showDate]="false" />
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+  }
+
+  @if (hasMore()) {
+    <button type="button" class="button button--secondary load-more" [disabled]="loadingMore()" (click)="loadMore()">
+      {{ loadingMore() ? 'Caricamento…' : 'Carica altri movimenti' }}
+    </button>
+  }
+</section>

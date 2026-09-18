@@ -1,0 +1,33 @@
+<header class="sheet__header">
+  <h2 id="quick-entry-title">Nuova operazione</h2>
+  <button type="button" class="icon-button" aria-label="Chiudi" (click)="dialogRef.close()">
+    <app-icon name="x" />
+  </button>
+</header>
+
+<div class="sheet__choices">
+  @for (choice of choices; track choice.type) {
+    <button
+      type="button"
+      class="choice choice--{{ choice.type }}"
+      (click)="dialogRef.close({ type: choice.type })"
+    >
+      <span class="choice__icon"><app-icon [name]="choice.icon" [size]="24" /></span>
+      {{ choice.label }}
+    </button>
+  }
+</div>
+
+@if (favorites().length > 0) {
+  <section class="sheet__favorites" aria-labelledby="quick-entry-favorites-title">
+    <h3 id="quick-entry-favorites-title" class="muted">Modelli preferiti</h3>
+    <div class="favorites">
+      @for (template of favorites(); track template.id) {
+        <button type="button" class="favorite" (click)="dialogRef.close({ template: template })">
+          <app-icon [name]="templateIcon(template)" [size]="18" />
+          <span>{{ template.name }}</span>
+        </button>
+      }
+    </div>
+  </section>
+}

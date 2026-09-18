@@ -1,0 +1,60 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Altro</h1>
+  </header>
+
+  <nav class="card more__card" aria-label="Altre sezioni">
+    <ul class="more__list">
+      @for (link of links; track link.path) {
+        <li>
+          <a class="more__link" [routerLink]="link.path">
+            <app-icon [name]="link.icon" />
+            {{ link.label }}
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <section class="card section" aria-labelledby="period-title">
+    <h2 id="period-title">Periodo di visualizzazione</h2>
+    <p class="muted">
+      Filtra movimenti, totali del riepilogo e resoconto. Con "Tutto" vedi l'intero storico. Budget e previsioni restano mensili.
+    </p>
+    <div class="field">
+      <label class="field__label" for="period-preset">Periodo</label>
+      <select id="period-preset" class="field__control" [ngModel]="preset()" (ngModelChange)="preset.set($event)">
+        @for (option of presets; track option) {
+          <option [value]="option">{{ presetLabels[option] }}</option>
+        }
+      </select>
+    </div>
+    @if (preset() === 'custom') {
+      <div class="field-row">
+        <div class="field">
+          <label class="field__label" for="period-start">Dal</label>
+          <input id="period-start" class="field__control" type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+        </div>
+        <div class="field">
+          <label class="field__label" for="period-end">Al</label>
+          <input id="period-end" class="field__control" type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+        </div>
+      </div>
+    }
+    <div class="dialog__footer">
+      <button type="button" class="button button--primary" [disabled]="saving()" (click)="savePeriod()">Applica periodo</button>
+    </div>
+  </section>
+
+  <section class="card more__profile" aria-labelledby="profile-title">
+    <app-icon name="circle-user" [size]="40" [strokeWidth]="1.5" />
+    <div class="more__profile-text">
+      <h2 id="profile-title">{{ displayName() }}</h2>
+      <p>{{ user()?.email }}</p>
+    </div>
+    <button type="button" class="button button--secondary" (click)="signOut()">
+      <app-icon name="log-out" />
+      Esci
+    </button>
+  </section>
+</section>

@@ -1,0 +1,330 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Resoconto</h1>
+      <p class="page-header__subtitle">Entrate e spese per periodo e per categoria. Trasferimenti esclusi.</p>
+    </div>
+  </header>
+
+  <div class="card report-controls">
+    <div class="toolbar">
+      <div class="field">
+        <label class="field__label" for="report-start">Dal</label>
+        <input id="report-start" class="field__control" type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+      </div>
+      <div class="field">
+        <label class="field__label" for="report-end">Al</label>
+        <input id="report-end" class="field__control" type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+      </div>
+    </div>
+    <div class="report-controls__row">
+      <div class="segmented" role="group" aria-label="Raggruppa per">
+        @for (option of granularities; track option.value) {
+          <button
+            type="button"
+            class="segmented__option"
+            [attr.aria-pressed]="granularity() === option.value"
+            (click)="granularity.set(option.value); activePeriodKey.set(null)"
+          >
+            {{ option.label }}
+          </button>
+        }
+      </div>
+      <div class="segmented" role="group" aria-label="Livello categorie">
+        <button type="button" class="segmented__option" [attr.aria-pressed]="level() === 'macro'" (click)="level.set('macro')">
+          Macro
+        </button>
+        <button type="button" class="segmented__option" [attr.aria-pressed]="level() === 'detail'" (click)="level.set('detail')">
+          Dettaglio
+        </button>
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <label class="checkbox">
+        <input type="checkbox" [ngModel]="includeForecast()" (ngModelChange)="includeForecast.set($event)" />
+        Includi operazioni pianificate e ricorrenze previste
+      </label>
+      <app-info-hint
+        label="Includi previsioni"
+        text="Oltre ai movimenti confermati, conta anche le operazioni ancora da confermare e le prossime scadenze delle ricorrenze (fino a 60 giorni se non scegli una data 'Al')."
+      />
+    </div>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="alert alert--danger" role="alert">
+      <app-icon name="circle-alert" />
+      <div>
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="card section" aria-busy="true">
+      <p class="loading-indicator" role="status">Carico i dati del resoconto…</p>
+      <app-skeleton height="180px" />
+    </div>
+  } @else if (errorMessage()) {
+    <!-- The alert above already explains the problem and offers "Riprova". -->
+  } @else if (report().periods.length === 0) {
+    <div class="card">
+      <app-empty-state
+        icon="chart-column"
+        heading="Nessun dato nel periodo"
+        description="Quando registrerai entrate e spese, qui vedrai grafici e totali."
+      />
+    </div>
+  } @else {
+    <div class="report-kpis">
+      <div class="card stat">
+        <p class="stat__label">Entrate</p>
+        <p class="stat__value amount amount--positive">+{{ report().incomeCents | money }}</p>
+        <p class="muted">{{ counts().income }} {{ counts().income === 1 ? 'operazione' : 'operazioni' }}</p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">Spese</p>
+        <p class="stat__value amount amount--negative">−{{ report().expenseCents | money }}</p>
+        <p class="muted">
+          {{ counts().expense }} {{ counts().expense === 1 ? 'operazione' : 'operazioni' }}
+          @if (averageExpenseCents(); as average) {
+            · media {{ average | money }} per {{ granularityNoun() }}
+          }
+        </p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">Netto</p>
+        <p
+          class="stat__value amount"
+          [class.amount--negative]="report().netCents < 0"
+          [class.amount--positive]="report().netCents > 0"
+        >
+          {{ report().netCents | money }}
+        </p>
+        <p class="muted">Entrate meno spese del periodo: non è il saldo del conto</p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">
+          Quota risparmiata
+          <app-info-hint
+            label="Quota risparmiata"
+            text="Quanta parte delle entrate resta dopo le spese. Per esempio 20% significa che su 100 € entrati te ne restano 20."
+          />
+        </p>
+        @if (savingsRate() !== null) {
+          <p class="stat__value amount" [class.amount--negative]="savingsRate()! < 0">{{ savingsRate() }}%</p>
+          <p class="muted">delle entrate del periodo</p>
+        } @else {
+          <p class="stat__value">—</p>
+          <p class="muted">Nessuna entrata nel periodo</p>
+        }
+      </div>
+    </div>
+
+    <div class="report-donuts">
+      <section class="card section" aria-labelledby="report-split-title">
+        <h2 id="report-split-title">Entrate e spese</h2>
+        @if (incomeExpenseSlices().length === 0) {
+          <p class="muted">Nessun importo in questo periodo.</p>
+        } @else {
+          <div class="donut-block">
+            <app-donut-chart
+              [slices]="incomeExpenseSlices()"
+              [ariaLabel]="'Entrate e spese a confronto'"
+              [centerValue]="savingsRate() !== null ? savingsRate() + '%' : '—'"
+              centerLabel="risparmiato"
+            />
+            <ul class="donut-legend">
+              @for (slice of incomeExpenseSlices(); track slice.key) {
+                <li>
+                  <span class="donut-legend__swatch" [style.background]="slice.color"></span>
+                  <span class="donut-legend__name">{{ slice.name }}</span>
+                  <span class="donut-legend__value">
+                    <strong class="amount">{{ slice.amountCents | money }}</strong>
+                    <span class="muted">{{ slice.percent }}%</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+
+      <section class="card section" aria-labelledby="report-expense-macro-title">
+        <h2 id="report-expense-macro-title">Dove vanno i soldi</h2>
+        @if (expenseMacroSlices().length === 0) {
+          <p class="muted">Nessuna spesa in questo periodo.</p>
+        } @else {
+          <div class="donut-block">
+            <app-donut-chart
+              [slices]="expenseMacroSlices()"
+              [ariaLabel]="'Spese per macrocategoria'"
+              [centerValue]="expenseMacroSlices().length + ''"
+              [centerLabel]="expenseMacroSlices().length === 1 ? 'categoria' : 'categorie'"
+            />
+            <ul class="donut-legend">
+              @for (slice of expenseMacroSlices(); track slice.key) {
+                <li>
+                  <span class="donut-legend__swatch" [style.background]="slice.color"></span>
+                  <span class="donut-legend__name">{{ slice.name }}</span>
+                  <span class="donut-legend__value">
+                    <strong class="amount">{{ slice.amountCents | money }}</strong>
+                    <span class="muted">{{ slice.percent }}%</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+
+      <section class="card section" aria-labelledby="report-income-macro-title">
+        <h2 id="report-income-macro-title">Da dove arrivano</h2>
+        @if (incomeMacroSlices().length === 0) {
+          <p class="muted">Nessuna entrata in questo periodo.</p>
+        } @else {
+          <div class="donut-block">
+            <app-donut-chart
+              [slices]="incomeMacroSlices()"
+              [ariaLabel]="'Entrate per macrocategoria'"
+              [centerValue]="incomeMacroSlices().length + ''"
+              [centerLabel]="incomeMacroSlices().length === 1 ? 'categoria' : 'categorie'"
+            />
+            <ul class="donut-legend">
+              @for (slice of incomeMacroSlices(); track slice.key) {
+                <li>
+                  <span class="donut-legend__swatch" [style.background]="slice.color"></span>
+                  <span class="donut-legend__name">{{ slice.name }}</span>
+                  <span class="donut-legend__value">
+                    <strong class="amount">{{ slice.amountCents | money }}</strong>
+                    <span class="muted">{{ slice.percent }}%</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    </div>
+
+    <section class="card section" aria-labelledby="report-trend-title">
+      <div class="section__header">
+        <h2 id="report-trend-title">Entrate e spese per {{ granularityNoun() }}</h2>
+        <ul class="legend" aria-label="Legenda">
+          <li><span class="legend__swatch legend__swatch--income"></span>Entrate</li>
+          <li><span class="legend__swatch legend__swatch--expense"></span>Spese</li>
+        </ul>
+      </div>
+
+      <div class="chart" role="img" [attr.aria-label]="'Grafico a colonne di entrate e spese. Valore massimo ' + chart().maxLabel">
+        <div class="chart__scroll" #chartHost>
+          <svg [attr.width]="chart().width" [attr.height]="chart().totalHeight" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().totalHeight">
+            <line class="chart__grid" [attr.x1]="chart().axisWidth" [attr.x2]="chart().width" y1="0.5" y2="0.5" />
+            <line class="chart__grid" [attr.x1]="chart().axisWidth" [attr.x2]="chart().width" [attr.y1]="chart().height / 2" [attr.y2]="chart().height / 2" />
+            <line class="chart__baseline" [attr.x1]="chart().axisWidth" [attr.x2]="chart().width" [attr.y1]="chart().height" [attr.y2]="chart().height" />
+            <text class="chart__axis-label" [attr.x]="chart().axisWidth - 8" y="12" text-anchor="end">{{ chart().maxLabel }}</text>
+            <text class="chart__axis-label" [attr.x]="chart().axisWidth - 8" [attr.y]="chart().height / 2 + 4" text-anchor="end">{{ chart().halfLabel }}</text>
+            <text class="chart__axis-label" [attr.x]="chart().axisWidth - 8" [attr.y]="chart().height" text-anchor="end">0</text>
+            @for (group of chart().groups; track group.period.key) {
+              <g
+                class="chart__group"
+                [class.chart__group--active]="activePeriodKey() === group.period.key"
+                (mouseenter)="activePeriodKey.set(group.period.key)"
+                (mouseleave)="activePeriodKey.set(null)"
+                (click)="activePeriodKey.set(group.period.key)"
+              >
+                <rect class="chart__hit" [attr.x]="group.left" y="0" [attr.width]="group.groupWidth" [attr.height]="chart().totalHeight">
+                  <title>{{ describePeriod(group.period) }}</title>
+                </rect>
+                <path class="chart__bar chart__bar--income" [attr.d]="group.incomePath" />
+                <path class="chart__bar chart__bar--expense" [attr.d]="group.expensePath" />
+                <text class="chart__label" [attr.x]="group.center" [attr.y]="chart().height + 18" text-anchor="middle">
+                  {{ group.label }}
+                </text>
+              </g>
+            }
+          </svg>
+        </div>
+      </div>
+
+      <div class="chart__details" aria-live="polite">
+        @if (activePeriod(); as period) {
+          <strong>{{ periodLabel(period.key) }}</strong>
+          <span>Entrate <strong class="amount">+{{ period.incomeCents | money }}</strong></span>
+          <span>Spese <strong class="amount">−{{ period.expenseCents | money }}</strong></span>
+          <span>Netto <strong class="amount">{{ period.netCents | money }}</strong></span>
+        } @else {
+          <span class="muted">Passa sopra (o tocca) una colonna per i dettagli, oppure apri la tabella qui sotto.</span>
+        }
+      </div>
+
+      <details class="chart__table">
+        <summary>Mostra i valori in tabella</summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Periodo</th>
+                <th scope="col">Entrate</th>
+                <th scope="col">Spese</th>
+                <th scope="col">Netto</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (period of report().periods; track period.key) {
+                <tr>
+                  <th scope="row">{{ periodLabel(period.key) }}</th>
+                  <td class="amount">{{ period.incomeCents | money }}</td>
+                  <td class="amount">{{ period.expenseCents | money }}</td>
+                  <td class="amount" [class.amount--negative]="period.netCents < 0">{{ period.netCents | money }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section class="card section" aria-labelledby="report-categories-title">
+      <div class="section__header">
+        <h2 id="report-categories-title">
+          {{ kind() === 'expense' ? 'Spese' : 'Entrate' }} per {{ level() === 'macro' ? 'macrocategoria' : 'categoria' }}
+        </h2>
+        <div class="segmented" role="group" aria-label="Tipo">
+          <button type="button" class="segmented__option" [attr.aria-pressed]="kind() === 'expense'" (click)="kind.set('expense')">Spese</button>
+          <button type="button" class="segmented__option" [attr.aria-pressed]="kind() === 'income'" (click)="kind.set('income')">Entrate</button>
+        </div>
+      </div>
+      @if (categoryTotals().length === 0) {
+        <p class="muted">Nessun importo in questo periodo.</p>
+      } @else {
+        <ul class="category-bars">
+          @for (item of categoryTotals(); track item.categoryId) {
+            <li class="category-bars__item">
+              <span class="category-bars__name">{{ item.name }}</span>
+              <span class="category-bars__track" aria-hidden="true">
+                <span
+                  class="category-bars__bar"
+                  [class.category-bars__bar--income]="kind() === 'income'"
+                  [style.width.%]="item.width"
+                ></span>
+              </span>
+              <span class="category-bars__value">
+                <strong class="amount">{{ item.amountCents | money }}</strong>
+                <span class="muted">{{ item.share }}%</span>
+              </span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  <p class="muted">
+    Dati dal {{ startDate() ? (startDate() | localDate) : 'primo movimento' }} al {{ endDate() ? (endDate() | localDate) : 'ultimo movimento' }}.
+    @if (includeForecast()) {
+      Includono operazioni pianificate e ricorrenze previste.
+    }
+  </p>
+</section>

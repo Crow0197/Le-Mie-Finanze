@@ -1,0 +1,131 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.field__control--compact {
+  width: auto;
+  min-height: 36px;
+  padding: 0 var(--space-6) 0 var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.field__control {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  transition: border-color var(--duration-fast) var(--easing-standard);
+
+  &:hover {
+    border-color: var(--color-text-muted);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-primary-soft);
+    outline-offset: 0;
+    border-color: var(--color-primary);
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+}
+
+select.field__control {
+  appearance: none;
+  padding-right: var(--space-6);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.field__error {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.field__hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.field-row {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 560px) {
+  .field-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  font-weight: 500;
+  cursor: pointer;
+
+  input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--color-primary);
+  }
+}
+
+.amount-input {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.details-toggle {
+  justify-self: start;
+}
+
+/* iOS Safari zooms the page when a focused control uses a font smaller than 16px. */
+@media (max-width: 1023px) {
+  .field__control {
+    font-size: 16px;
+  }
+}
+
+/* iOS renders date inputs with an intrinsic width and centered text that overflow their container. */
+@supports (-webkit-touch-callout: none) {
+  input[type='date'].field__control,
+  input[type='time'].field__control {
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+
+  input[type='date'].field__control::-webkit-date-and-time-value,
+  input[type='time'].field__control::-webkit-date-and-time-value {
+    text-align: left;
+  }
+}

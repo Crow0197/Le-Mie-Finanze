@@ -1,0 +1,434 @@
+<main class="onboarding card" aria-labelledby="onboarding-title">
+  <p class="onboarding__brand"><app-icon name="wallet" />{{ appName }}</p>
+
+  <div class="onboarding__progress" aria-hidden="true">
+    @for (item of stepNumbers; track item) {
+      <span [class.onboarding__dot--active]="item <= step()"></span>
+    }
+  </div>
+  <p class="muted">Passaggio {{ step() }} di {{ totalSteps }}</p>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert--danger" role="alert">{{ message }}</p>
+  }
+
+  @if (loading()) {
+    <p class="muted" aria-busy="true">Preparazione in corso…</p>
+  } @else {
+    @switch (step()) {
+      @case (1) {
+        <form class="form" [formGroup]="profileForm" (ngSubmit)="saveProfile()" novalidate>
+          <div>
+            <h1 id="onboarding-title">Benvenuto</h1>
+            <p class="muted">Pochi minuti per partire con i numeri giusti. Ti guido passo per passo.</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="onboarding-name">Come ti chiami?</label>
+            <input
+              id="onboarding-name"
+              class="field__control"
+              type="text"
+              maxlength="60"
+              autocomplete="given-name"
+              formControlName="displayName"
+              [attr.aria-invalid]="showError(profileForm.controls.displayName)"
+              [attr.aria-describedby]="showError(profileForm.controls.displayName) ? 'onboarding-name-error' : null"
+            />
+            @if (showError(profileForm.controls.displayName)) {
+              <p id="onboarding-name-error" class="field__error">Inserisci il tuo nome.</p>
+            }
+          </div>
+          <div class="onboarding__tip">
+            <app-icon name="calendar" />
+            <div>
+              <strong>Si parte da oggi, {{ today | localDate }}</strong>
+              <p class="muted">
+                Quello che è successo prima è già nel saldo della banca: non va reinserito. Userai i saldi di oggi e da qui in
+                avanti registrerai entrate e spese.
+              </p>
+            </div>
+          </div>
+          <div class="dialog__footer">
+            <button type="button" class="button button--ghost" [disabled]="saving()" (click)="finish()">Salta tutto</button>
+            <button type="submit" class="button button--primary" [disabled]="saving()">Iniziamo</button>
+          </div>
+        </form>
+      }
+
+      @case (2) {
+        <div class="form">
+          <div>
+            <h1 id="onboarding-title">I tuoi conti</h1>
+            <p class="muted">Aggiungi conto corrente, carte, contanti o conto risparmi con il saldo che vedi <strong>oggi</strong> in banca.</p>
+          </div>
+
+          @if (store.activeAccounts().length > 0) {
+            <fieldset class="onboarding__fieldset">
+              <legend class="field__label">Conto predefinito per le spese</legend>
+              <ul class="list">
+                @for (account of store.activeAccounts(); track account.id) {
+                  <li class="list-item">
+                    <label class="checkbox onboarding__radio">
+                      <input
+                        type="radio"
+                        name="onboarding-default-account"
+                        [checked]="store.defaultAccount()?.id === account.id"
+                        [disabled]="saving()"
+                        (change)="setDefaultAccount(account.id)"
+                      />
+                      <span class="list-item__main">
+                        <strong>{{ account.name }}</strong>
+                        <span>
+                          {{ accountTypeLabels[account.type] }}
+                          {{ account.includeInAvailable ? '· spendibile' : '· non spendibile' }}
+                          {{ account.includeInNetWorth ? '' : '· escluso dal totale' }}
+                        </span>
+                      </span>
+                    </label>
+                    <strong class="amount">{{ account.currentBalanceCents | money }}</strong>
+                  </li>
+                }
+              </ul>
+            </fieldset>
+          }
+
+          <form class="form onboarding__subform" [formGroup]="accountForm" (ngSubmit)="addAccount()" novalidate>
+            <h2 class="onboarding__subtitle">{{ store.activeAccounts().length > 0 ? 'Aggiungi un altro conto' : 'Primo conto' }}</h2>
+            <div class="field">
+              <label class="field__label" for="onboarding-account-name">Nome del conto</label>
+              <input
+                id="onboarding-account-name"
+                class="field__control"
+                type="text"
+                maxlength="60"
+                placeholder="Per esempio Conto corrente"
+                formControlName="name"
+                [attr.aria-invalid]="showError(accountForm.controls.name)"
+              />
+              @if (showError(accountForm.controls.name)) {
+                <p class="field__error">Inserisci un nome.</p>
+              }
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label" for="onboarding-account-type">Tipo</label>
+                <select id="onboarding-account-type" class="field__control" formControlName="type" (change)="onAccountTypeChange()">
+                  @for (type of accountTypes; track type) {
+                    <option [value]="type">{{ accountTypeLabels[type] }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label class="field__label" for="onboarding-account-balance">Saldo di oggi (€)</label>
+                <input
+                  id="onboarding-account-balance"
+                  class="field__control"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="1250,00"
+                  formControlName="openingBalance"
+                  aria-describedby="onboarding-balance-hint"
+                  [attr.aria-invalid]="showError(accountForm.controls.openingBalance)"
+                />
+                <p id="onboarding-balance-hint" [class]="showError(accountForm.controls.openingBalance) ? 'field__error' : 'field__hint'">
+                  {{ showError(accountForm.controls.openingBalance) ? 'Inserisci un importo valido, anche negativo.' : 'Copialo dalla app della banca.' }}
+                </p>
+              </div>
+            </div>
+            <label class="checkbox">
+              <input type="checkbox" formControlName="includeInAvailable" />
+              Soldi che uso per le spese di tutti i giorni
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" formControlName="includeInNetWorth" />
+              Conta nel saldo totale
+            </label>
+            <div class="onboarding__inline-actions">
+              <button type="submit" class="button button--secondary button--small" [disabled]="saving()">
+                <app-icon name="plus" [size]="16" />
+                Aggiungi conto
+              </button>
+            </div>
+          </form>
+
+          <div class="dialog__footer">
+            <button type="button" class="button button--ghost" [disabled]="saving()" (click)="goTo(1)">Indietro</button>
+            <button type="button" class="button button--primary" [disabled]="saving()" (click)="continueFromAccounts()">Continua</button>
+          </div>
+        </div>
+      }
+
+      @case (3) {
+        <div class="form">
+          <div>
+            <h1 id="onboarding-title">Le categorie</h1>
+            <p class="muted">
+              Ogni spesa ed entrata finisce in una categoria. Le macrocategorie raggruppano le altre nel Resoconto. Ne ho già
+              preparate alcune: potrai rinominarle o aggiungerne da <strong>Amministrazione → Categorie</strong>.
+            </p>
+          </div>
+          <h2 class="onboarding__subtitle">Spese</h2>
+          <ul class="onboarding__categories">
+            @for (group of expenseCategoryGroups(); track group.macro.id) {
+              <li>
+                <strong>{{ group.macro.name }}</strong>
+                @if (group.children.length > 0) {
+                  <span class="muted">
+                    @for (child of group.children; track child.id; let last = $last) {
+                      {{ child.name }}{{ last ? '' : ', ' }}
+                    }
+                  </span>
+                }
+              </li>
+            }
+          </ul>
+          <h2 class="onboarding__subtitle">Entrate</h2>
+          <ul class="onboarding__categories">
+            @for (group of incomeCategoryGroups(); track group.macro.id) {
+              <li><strong>{{ group.macro.name }}</strong></li>
+            }
+          </ul>
+          <div class="dialog__footer">
+            <button type="button" class="button button--ghost" (click)="goTo(2)">Indietro</button>
+            <button type="button" class="button button--primary" (click)="goTo(4)">Vanno bene, continua</button>
+          </div>
+        </div>
+      }
+
+      @case (4) {
+        @if (existingSalary(); as salary) {
+          <div class="form">
+            <div>
+              <h1 id="onboarding-title">Stipendio</h1>
+              <p class="muted">È già configurato.</p>
+            </div>
+            <div class="onboarding__tip">
+              <app-icon name="briefcase" />
+              <div>
+                <strong>{{ salary.amountCents | money }} · giorno {{ salary.dayOfMonth }} · {{ accountName(salary.accountId) }}</strong>
+                <p class="muted">Prossimo accredito: {{ salary.nextOccurrenceDate | localDate }}. Puoi modificarlo da Pianificate.</p>
+              </div>
+            </div>
+            <div class="dialog__footer">
+              <button type="button" class="button button--ghost" (click)="goTo(3)">Indietro</button>
+              <button type="button" class="button button--primary" (click)="goTo(5)">Continua</button>
+            </div>
+          </div>
+        } @else {
+          <form class="form" [formGroup]="salaryForm" (ngSubmit)="saveSalary()" novalidate>
+            <div>
+              <h1 id="onboarding-title">Stipendio</h1>
+              <p class="muted">Serve per sapere quanto puoi spendere fino al prossimo accredito. La data la calcolo io.</p>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label" for="onboarding-salary">Importo netto (€)</label>
+                <input
+                  id="onboarding-salary"
+                  class="field__control"
+                  type="text"
+                  inputmode="decimal"
+                  formControlName="amount"
+                  [attr.aria-invalid]="showError(salaryForm.controls.amount)"
+                />
+                @if (showError(salaryForm.controls.amount)) {
+                  <p class="field__error">Inserisci un importo maggiore di zero.</p>
+                }
+              </div>
+              <div class="field">
+                <label class="field__label" for="onboarding-salary-day">Giorno di accredito</label>
+                <input id="onboarding-salary-day" class="field__control" type="number" min="1" max="31" formControlName="dayOfMonth" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="onboarding-salary-account">Conto di accredito</label>
+              <select id="onboarding-salary-account" class="field__control" formControlName="accountId">
+                @for (account of store.activeAccounts(); track account.id) {
+                  <option [value]="account.id">{{ account.name }}</option>
+                }
+              </select>
+            </div>
+            @if (salaryFirst().occursToday) {
+              <label class="checkbox">
+                <input type="checkbox" formControlName="alreadyInBalance" />
+                Lo stipendio di oggi è già arrivato ed è nel saldo che ho inserito
+              </label>
+            }
+            <label class="checkbox">
+              <input type="checkbox" formControlName="variableAmount" />
+              L'importo cambia ogni mese (ti chiederò di confermarlo)
+            </label>
+            @if (salaryFirst().nextDate; as nextDate) {
+              <p class="onboarding__preview"><app-icon name="calendar-clock" [size]="18" /> Prossimo accredito: <strong>{{ nextDate | localDate }}</strong></p>
+            }
+            <div class="dialog__footer">
+              <button type="button" class="button button--ghost" [disabled]="saving()" (click)="goTo(5)">Non ho uno stipendio</button>
+              <button type="submit" class="button button--primary" [disabled]="saving()">Salva e continua</button>
+            </div>
+          </form>
+        }
+      }
+
+      @case (5) {
+        <div class="form">
+          <div>
+            <h1 id="onboarding-title">Spese fisse</h1>
+            <p class="muted">
+              Abbonamenti, rate, affitto, bollette: indica solo il giorno del mese. Parto dal <strong>prossimo</strong> addebito, così
+              quelli già pagati non vengono contati due volte.
+            </p>
+          </div>
+
+          @if (standardRules().length > 0) {
+            <ul class="list">
+              @for (rule of standardRules(); track rule.id) {
+                <li class="list-item">
+                  <span class="list-item__main">
+                    <strong>{{ rule.name }}</strong>
+                    <span>{{ accountName(rule.accountId) }} · prossimo {{ rule.nextOccurrenceDate | localDate }}</span>
+                  </span>
+                  <strong class="amount" [class.amount--positive]="rule.transactionType === 'income'">
+                    {{ rule.transactionType === 'income' ? '+' : '−' }}{{ rule.amountCents | money }}
+                  </strong>
+                </li>
+              }
+            </ul>
+          }
+
+          <form class="form onboarding__subform" [formGroup]="ruleForm" (ngSubmit)="addRule()" novalidate>
+            <div class="segmented" role="group" aria-label="Tipo">
+              <button type="button" class="segmented__option" [attr.aria-pressed]="ruleForm.controls.transactionType.value === 'expense'" (click)="setRuleType('expense')">Spesa</button>
+              <button type="button" class="segmented__option" [attr.aria-pressed]="ruleForm.controls.transactionType.value === 'income'" (click)="setRuleType('income')">Entrata</button>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label" for="onboarding-rule-name">Nome</label>
+                <input
+                  id="onboarding-rule-name"
+                  class="field__control"
+                  type="text"
+                  maxlength="80"
+                  placeholder="Per esempio Netflix"
+                  formControlName="name"
+                  [attr.aria-invalid]="showError(ruleForm.controls.name)"
+                />
+              </div>
+              <div class="field">
+                <label class="field__label" for="onboarding-rule-amount">Importo (€)</label>
+                <input
+                  id="onboarding-rule-amount"
+                  class="field__control"
+                  type="text"
+                  inputmode="decimal"
+                  formControlName="amount"
+                  [attr.aria-invalid]="showError(ruleForm.controls.amount)"
+                />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label" for="onboarding-rule-day">Giorno del mese</label>
+                <input id="onboarding-rule-day" class="field__control" type="number" min="1" max="31" formControlName="dayOfMonth" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="onboarding-rule-account">Conto</label>
+                <select id="onboarding-rule-account" class="field__control" formControlName="accountId">
+                  @for (account of store.activeAccounts(); track account.id) {
+                    <option [value]="account.id">{{ account.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="onboarding-rule-category">Categoria</label>
+              <select
+                id="onboarding-rule-category"
+                class="field__control"
+                formControlName="categoryId"
+                [attr.aria-invalid]="showError(ruleForm.controls.categoryId)"
+              >
+                <option value="" disabled>Seleziona una categoria</option>
+                @for (group of ruleCategoryGroups(); track group.macro.id) {
+                  <option [value]="group.macro.id">{{ group.macro.name }}</option>
+                  @for (child of group.children; track child.id) {
+                    <option [value]="child.id">— {{ child.name }}</option>
+                  }
+                }
+              </select>
+            </div>
+            @if (ruleFirst().occursToday) {
+              <label class="checkbox">
+                <input type="checkbox" formControlName="alreadyInBalance" />
+                Quello di oggi è già stato addebitato ed è nel saldo
+              </label>
+            }
+            @if (ruleFirst().nextDate; as nextDate) {
+              <p class="onboarding__preview"><app-icon name="calendar-clock" [size]="18" /> Primo addebito che registrerò: <strong>{{ nextDate | localDate }}</strong></p>
+            }
+            <p class="field__hint">Mensili qui; annuali, settimanali o ogni tot mesi le aggiungi dopo da Pianificate.</p>
+            <div class="onboarding__inline-actions">
+              <button type="submit" class="button button--secondary button--small" [disabled]="saving()">
+                <app-icon name="plus" [size]="16" />
+                Aggiungi
+              </button>
+            </div>
+          </form>
+
+          <div class="dialog__footer">
+            <button type="button" class="button button--ghost" [disabled]="saving()" (click)="goTo(4)">Indietro</button>
+            <button type="button" class="button button--primary" [disabled]="saving()" (click)="goTo(6)">
+              {{ standardRules().length > 0 ? 'Continua' : 'Le aggiungo dopo' }}
+            </button>
+          </div>
+        </div>
+      }
+
+      @case (6) {
+        <div class="form">
+          <div>
+            <h1 id="onboarding-title">Tutto pronto</h1>
+            <p class="muted">Ecco da dove parti.</p>
+          </div>
+          <ul class="onboarding__facts">
+            <li>
+              <app-icon name="landmark" [size]="18" />
+              {{ store.activeAccounts().length }} {{ store.activeAccounts().length === 1 ? 'conto' : 'conti' }} · saldo totale
+              <strong>{{ netWorthCents() | money }}</strong>
+            </li>
+            <li>
+              <app-icon name="briefcase" [size]="18" />
+              @if (existingSalary(); as salary) {
+                Stipendio {{ salary.amountCents | money }}, prossimo {{ salary.nextOccurrenceDate | localDate }}
+              } @else {
+                Stipendio non configurato
+              }
+            </li>
+            <li>
+              <app-icon name="repeat" [size]="18" />
+              {{ standardRules().length }} {{ standardRules().length === 1 ? 'spesa fissa' : 'spese fisse' }}
+              @if (monthlyRulesCents() > 0) {
+                · {{ monthlyRulesCents() | money }} al mese
+              }
+            </li>
+          </ul>
+
+          <h2 class="onboarding__subtitle">Per avere sempre i numeri giusti</h2>
+          <ul class="onboarding__habits">
+            <li><strong>Ogni giorno:</strong> registra le spese con il pulsante <strong>+</strong>, anche quelle piccole.</li>
+            <li><strong>Soldi tra i tuoi conti:</strong> usa <strong>Trasferimento</strong>, non spesa più entrata.</li>
+            <li>
+              <strong>Una volta al mese:</strong> confronta i saldi con la banca. Se non tornano, aggiungi un movimento di
+              allineamento con la differenza invece di cambiare il saldo iniziale.
+            </li>
+            <li><strong>Backup:</strong> ogni tanto fai Export JSON da Amministrazione.</li>
+          </ul>
+
+          <div class="dialog__footer">
+            <button type="button" class="button button--ghost" [disabled]="saving()" (click)="goTo(5)">Indietro</button>
+            <button type="button" class="button button--primary" [disabled]="saving()" (click)="finish()">Inizia a usare l'app</button>
+          </div>
+        </div>
+      }
+    }
+  }
+</main>

@@ -1,0 +1,266 @@
+<form class="dialog" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <header class="dialog__header">
+    <h2 id="transaction-form-title">{{ title() }}</h2>
+    <button type="button" class="icon-button" aria-label="Chiudi" (click)="close()">
+      <app-icon name="x" />
+    </button>
+  </header>
+
+  <div class="segmented type-switch" role="group" aria-label="Tipo di operazione">
+    @for (option of types; track option) {
+      <button
+        type="button"
+        class="segmented__option"
+        [attr.aria-pressed]="type() === option"
+        (click)="setType(option)"
+      >
+        {{ typeLabels[option] }}
+      </button>
+    }
+  </div>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert--danger" role="alert">{{ message }}</p>
+  }
+
+  <div class="field">
+    <label class="field__label" for="transaction-amount">Importo (€)</label>
+    <input
+      id="transaction-amount"
+      class="field__control amount-input"
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      placeholder="0,00"
+      formControlName="amount"
+      [attr.aria-invalid]="!!fieldErrors().amount"
+      [attr.aria-describedby]="fieldErrors().amount ? 'transaction-amount-error' : null"
+    />
+    @if (fieldErrors().amount; as error) {
+      <p id="transaction-amount-error" class="field__error">{{ error }}</p>
+    }
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label class="field__label" for="transaction-account">
+        {{ type() === 'transfer' ? 'Da conto' : type() === 'income' ? 'Conto di accredito' : 'Conto di addebito' }}
+      </label>
+      <select
+        id="transaction-account"
+        class="field__control"
+        formControlName="accountId"
+        [attr.aria-invalid]="!!fieldErrors().accountId"
+        [attr.aria-describedby]="fieldErrors().accountId ? 'transaction-account-error' : null"
+      >
+        <option value="" disabled>Seleziona un conto</option>
+        @for (account of accountOptions(); track account.id) {
+          <option [value]="account.id" [disabled]="account.archived">
+            {{ account.name }}{{ account.archived ? ' (archiviato)' : '' }}
+          </option>
+        }
+      </select>
+      @if (fieldErrors().accountId; as error) {
+        <p id="transaction-account-error" class="field__error">{{ error }}</p>
+      }
+    </div>
+
+    @if (type() === 'transfer') {
+      <div class="field">
+        <label class="field__label" for="transaction-destination">A conto</label>
+        <select
+          id="transaction-destination"
+          class="field__control"
+          formControlName="destinationAccountId"
+          [attr.aria-invalid]="!!fieldErrors().destinationAccountId"
+          [attr.aria-describedby]="fieldErrors().destinationAccountId ? 'transaction-destination-error' : null"
+        >
+          <option value="" disabled>Seleziona un conto</option>
+          @for (account of accountOptions(); track account.id) {
+            <option [value]="account.id" [disabled]="account.archived">{{ account.name }}</option>
+          }
+        </select>
+        @if (fieldErrors().destinationAccountId; as error) {
+          <p id="transaction-destination-error" class="field__error">{{ error }}</p>
+        }
+      </div>
+    } @else {
+      <div class="field">
+        <label class="field__label" for="transaction-category">Categoria</label>
+        <select
+          id="transaction-category"
+          class="field__control"
+          formControlName="categoryId"
+          [attr.aria-invalid]="!!fieldErrors().categoryId"
+          [attr.aria-describedby]="fieldErrors().categoryId ? 'transaction-category-error' : null"
+        >
+          <option value="" disabled>Seleziona una categoria</option>
+          @for (group of categoryGroups(); track group.macro.id) {
+            @if (group.children.length > 0) {
+              <optgroup [label]="group.macro.name">
+                <option [value]="group.macro.id">{{ group.macro.name }} (generale)</option>
+                @for (child of group.children; track child.id) {
+                  <option [value]="child.id">{{ child.name }}</option>
+                }
+              </optgroup>
+            } @else {
+              <option [value]="group.macro.id">{{ group.macro.name }}</option>
+            }
+          }
+        </select>
+        @if (fieldErrors().categoryId; as error) {
+          <p id="transaction-category-error" class="field__error">{{ error }}</p>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="field">
+    <label class="field__label" for="transaction-description">Descrizione (facoltativa)</label>
+    <input
+      id="transaction-description"
+      class="field__control"
+      type="text"
+      maxlength="200"
+      formControlName="description"
+    />
+  </div>
+
+  @if (!showDetails()) {
+    <button type="button" class="button button--ghost details-toggle" (click)="showDetails.set(true)">
+      <app-icon name="chevron-down" [size]="18" />
+      Altri dettagli
+    </button>
+  } @else {
+    <div class="details">
+      <div class="field-row">
+        <div class="field">
+          <label class="field__label" for="transaction-date">Data</label>
+          <input
+            id="transaction-date"
+            class="field__control"
+            type="date"
+            formControlName="effectiveDate"
+            [attr.aria-invalid]="!!fieldErrors().effectiveDate"
+            aria-describedby="transaction-date-hint"
+          />
+          @if (fieldErrors().effectiveDate; as error) {
+            <p id="transaction-date-hint" class="field__error">{{ error }}</p>
+          } @else if (form.controls.effectiveDate.value > today) {
+            <p id="transaction-date-hint" class="field__hint">
+              Data futura: sarà registrata come pianificata e non cambierà il saldo finché non la confermi.
+            </p>
+          }
+        </div>
+
+        @if (type() === 'transfer') {
+          <div class="field">
+            <label class="field__label" for="transaction-fee">Commissione (facoltativa)</label>
+            <input
+              id="transaction-fee"
+              class="field__control"
+              type="text"
+              inputmode="decimal"
+              placeholder="0,00"
+              formControlName="fee"
+              [attr.aria-invalid]="!!fieldErrors().fee"
+              aria-describedby="transaction-fee-hint"
+            />
+            <p id="transaction-fee-hint" [class]="fieldErrors().fee ? 'field__error' : 'field__hint'">
+              {{ fieldErrors().fee ?? 'Viene sottratta solo dal conto di origine e conteggiata come spesa.' }}
+            </p>
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="transaction-notes">Note</label>
+        <textarea id="transaction-notes" class="field__control" rows="2" maxlength="500" formControlName="notes"></textarea>
+      </div>
+
+      @if (!editing && type() !== 'transfer') {
+        <label class="checkbox">
+          <input type="checkbox" formControlName="repeat" />
+          Ripeti questa operazione
+        </label>
+        @if (form.controls.repeat.value) {
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="transaction-frequency">Frequenza</label>
+              <select id="transaction-frequency" class="field__control" formControlName="frequency">
+                @for (frequency of frequencies; track frequency) {
+                  <option [value]="frequency">{{ frequencyLabels[frequency] }}</option>
+                }
+              </select>
+            </div>
+            @if (form.controls.frequency.value === 'customMonths') {
+              <div class="field">
+                <label class="field__label" for="transaction-interval">Ogni quanti mesi</label>
+                <input id="transaction-interval" class="field__control" type="number" min="2" max="24" formControlName="interval" />
+              </div>
+            }
+            <div class="field">
+              <label class="field__label" for="transaction-end-date">Data finale (facoltativa)</label>
+              <input
+                id="transaction-end-date"
+                class="field__control"
+                type="date"
+                formControlName="endDate"
+                [attr.aria-invalid]="!!fieldErrors().endDate"
+                [attr.aria-describedby]="fieldErrors().endDate ? 'transaction-end-date-error' : null"
+              />
+              @if (fieldErrors().endDate; as error) {
+                <p id="transaction-end-date-error" class="field__error">{{ error }}</p>
+              }
+            </div>
+          </div>
+          <label class="checkbox">
+            <input type="checkbox" formControlName="autoPost" />
+            Registra automaticamente (altrimenti chiede conferma)
+          </label>
+        }
+      }
+
+      @if (!editing) {
+        <label class="checkbox">
+          <input type="checkbox" formControlName="saveAsTemplate" />
+          Salva come modello rapido
+        </label>
+        @if (form.controls.saveAsTemplate.value) {
+          <div class="field">
+            <label class="field__label" for="transaction-template-name">Nome del modello</label>
+            <input
+              id="transaction-template-name"
+              class="field__control"
+              type="text"
+              maxlength="40"
+              formControlName="templateName"
+              [attr.aria-invalid]="!!fieldErrors().templateName"
+              [attr.aria-describedby]="fieldErrors().templateName ? 'transaction-template-name-error' : null"
+            />
+            @if (fieldErrors().templateName; as error) {
+              <p id="transaction-template-name-error" class="field__error">{{ error }}</p>
+            }
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <footer class="dialog__footer">
+    @if (editing) {
+      <div class="dialog__footer-start">
+        <button type="button" class="icon-button" aria-label="Elimina" (click)="remove()">
+          <app-icon name="trash" />
+        </button>
+        <button type="button" class="icon-button" aria-label="Duplica" (click)="duplicate()">
+          <app-icon name="copy" />
+        </button>
+      </div>
+    }
+    <button type="button" class="button button--secondary" (click)="close()">Annulla</button>
+    <button type="submit" class="button button--primary" [disabled]="saving()">
+      {{ saving() ? 'Salvataggio…' : 'Salva' }}
+    </button>
+  </footer>
+</form>
