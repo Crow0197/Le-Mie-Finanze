@@ -1,15 +1,24 @@
-# Controllo su main: compila il progetto senza pubblicare niente.
+# Controlli su main e sulle pull request: compila e verifica il codice, senza pubblicare niente.
 # La pubblicazione avviene solo dal workflow "Rilascio".
 name: Build di controllo
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: npm ci && npm run build
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm run build
 
+  controlli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --watch=false
