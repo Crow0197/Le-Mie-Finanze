@@ -1,0 +1,40 @@
+# Rimette online una versione già rilasciata, senza toccare il codice.
+# Si lancia da Actions > Ripubblica una versione > Run workflow.
+name: Ripubblica una versione
+on:
+  workflow_dispatch:
+    inputs:
+      versione:
+        description: Tag da ripubblicare, per esempio v0.2.0
+        required: true
+        type: string
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.versione }}
+
+      - run: npm ci && npm run build
+
+      - name: Pubblica su Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LE_MIE_FINANZE_9280F }}
+          channelId: live
+          projectId: le-mie-finanze-9280f
+
+      - name: Avviso su Telegram
+        if: always() && env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            TESTO="Online di nuovo la versione ${{ inputs.versione }}: https://le-mie-finanze-9280f.web.app"
+          else
+            TESTO="Ripubblicazione di ${{ inputs.versione }} non riuscita: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" -d chat_id="$TELEGRAM_CHAT_ID" --data-urlencode "text=$TESTO" > /dev/null
