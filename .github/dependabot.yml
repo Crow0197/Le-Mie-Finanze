@@ -1,0 +1,21 @@
+# Una volta al mese apre le pull request con gli aggiornamenti delle dipendenze.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      angular:
+        patterns:
+          - "@angular*"
+          - angular-eslint
+          - typescript-eslint
+      firebase:
+        patterns:
+          - firebase*
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
