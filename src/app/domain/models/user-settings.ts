@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { NavigationPreference } from '../navigation/navigation';
 
 export const SCHEMA_VERSION = 1;
 
@@ -27,6 +28,8 @@ export interface UserSettings {
   onboardingCompleted: boolean;
   defaultAccountId?: string | null;
   viewPeriod: ViewPeriod;
+  /** Order and visibility of the sections in the menu; empty means the default order. */
+  navigation?: NavigationPreference[];
   schemaVersion: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;

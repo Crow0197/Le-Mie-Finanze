@@ -1,11 +1,13 @@
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { getFirebaseErrorMessage } from '../../../core/error-handling/firebase-error-message';
 import { RecurrenceSyncService } from '../../../core/state/recurrence-sync.service';
 import { TransactionActions } from '../../../core/state/transaction-actions.service';
 import { UserDataStore } from '../../../core/state/user-data.store';
 import { parseLocalDate, todayInTimeZone } from '../../../domain/dates/local-date';
+import { calculateAvailableCents } from '../../../domain/forecast/balances';
 import { formatCentsForInput, parseAmountToCents } from '../../../domain/money/money';
 import { QuickTemplate } from '../../../domain/models/quick-template';
 import {
@@ -18,6 +20,7 @@ import {
   TransactionDraft,
   TransactionType,
 } from '../../../domain/models/transaction';
+import { MoneyPipe } from '../../../shared/pipes/money.pipe';
 import { buildCategoryOptionGroups } from '../../../shared/ui/category-select/category-options';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { localDateValidator, positiveAmountValidator } from '../../../shared/utils/form-validators';
@@ -35,7 +38,7 @@ type FieldErrors = Partial<Record<'amount' | 'accountId' | 'destinationAccountId
 
 @Component({
   selector: 'app-transaction-form',
-  imports: [ReactiveFormsModule, Icon],
+  imports: [ReactiveFormsModule, Icon, MoneyPipe],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',
 })
@@ -89,6 +92,29 @@ export class TransactionForm {
     return type === 'transfer'
       ? []
       : buildCategoryOptionGroups(this.store.categories(), type, this.source?.categoryId);
+  });
+
+  private readonly formChanges = toSignal(this.form.valueChanges, { initialValue: null });
+  private readonly formValue = computed(() => {
+    this.formChanges();
+    return this.form.getRawValue();
+  });
+
+  /**
+   * Warns when a new expense would leave less than the safety buffer the user wants to keep aside.
+   * Only for new operations: on an edit the old amount is already part of the balance.
+   */
+  protected readonly bufferWarning = computed(() => {
+    const bufferCents = this.store.settings()?.safetyBufferCents ?? 0;
+    if (bufferCents <= 0 || this.editing || this.type() !== 'expense') {
+      return null;
+    }
+    const amountCents = parseAmountToCents(this.formValue().amount) ?? 0;
+    if (amountCents <= 0) {
+      return null;
+    }
+    const remainingCents = calculateAvailableCents(this.store.activeAccounts()) - amountCents;
+    return remainingCents < bufferCents ? { remainingCents, bufferCents } : null;
   });
 
   protected readonly title = computed(() =>

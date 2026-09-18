@@ -4,20 +4,14 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { DefaultAccountDialog } from '../../../features/accounts/default-account-dialog';
 import { QuickEntryService } from '../../../features/quick-entry/quick-entry.service';
 import { AppDialogService } from '../../../shared/ui/dialog/app-dialog.service';
-import { Icon, IconName } from '../../../shared/ui/icon/icon';
+import { Icon } from '../../../shared/ui/icon/icon';
 import { Snackbar } from '../../../shared/ui/snackbar/snackbar';
 import { APP_INFO } from '../../app-info';
 import { AuthService } from '../../auth/auth.service';
 import { getFirebaseErrorMessage } from '../../error-handling/firebase-error-message';
+import { NavigationService } from '../../state/navigation.service';
 import { RecurrenceSyncService } from '../../state/recurrence-sync.service';
 import { UserDataStore } from '../../state/user-data.store';
-
-interface NavigationItem {
-  path: string;
-  label: string;
-  icon: IconName;
-  exact: boolean;
-}
 
 @Component({
   selector: 'app-shell',
@@ -33,6 +27,7 @@ export class Shell {
   private readonly appDialog = inject(AppDialogService);
   private readonly dialog = inject(Dialog);
   protected readonly quickEntry = inject(QuickEntryService);
+  protected readonly navigation = inject(NavigationService);
 
   protected readonly appName = APP_INFO.name;
   protected readonly user = this.authService.user;
@@ -41,26 +36,6 @@ export class Shell {
   );
   protected readonly loadError = signal<string | null>(null);
   private defaultAccountDialogOpen = false;
-
-  protected readonly desktopNavigation: readonly NavigationItem[] = [
-    { path: '/', label: 'Riepilogo', icon: 'house', exact: true },
-    { path: '/movimenti', label: 'Movimenti', icon: 'list', exact: false },
-    { path: '/pianificate', label: 'Pianificate', icon: 'calendar-clock', exact: false },
-    { path: '/risparmio', label: 'Risparmio', icon: 'piggy-bank', exact: false },
-    { path: '/resoconto', label: 'Resoconto', icon: 'chart-column', exact: false },
-    { path: '/conti', label: 'Conti', icon: 'landmark', exact: false },
-    { path: '/amministrazione', label: 'Amministrazione', icon: 'settings', exact: false },
-  ];
-
-  protected readonly mobileNavigationStart: readonly NavigationItem[] = [
-    { path: '/', label: 'Home', icon: 'house', exact: true },
-    { path: '/movimenti', label: 'Movimenti', icon: 'list', exact: false },
-  ];
-
-  protected readonly mobileNavigationEnd: readonly NavigationItem[] = [
-    { path: '/risparmio', label: 'Risparmio', icon: 'piggy-bank', exact: false },
-    { path: '/altro', label: 'Altro', icon: 'ellipsis', exact: false },
-  ];
 
   constructor() {
     effect(() => {

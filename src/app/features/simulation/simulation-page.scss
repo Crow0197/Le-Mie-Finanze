@@ -1,0 +1,193 @@
+:host {
+  --chart-base: #8b8a85;
+  --chart-scenario: #2a78d6;
+}
+
+.sim-verdict {
+  align-items: center;
+  font-size: var(--font-size-md);
+
+  > div {
+    display: grid;
+    gap: var(--space-1);
+  }
+}
+
+.sim-verdict__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.sim-verdict__note {
+  margin-bottom: 0;
+  font-size: var(--font-size-sm);
+  opacity: 0.85;
+}
+
+.sim-horizon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.sim-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.sim-block {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sim-block__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.sim-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+/* On phones the result cards become a horizontal carousel, come in Resoconto. */
+@media (max-width: 599px) {
+  .sim-results {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 72%;
+    gap: var(--space-3);
+    margin-inline: calc(-1 * var(--space-4));
+    padding: 2px var(--space-4) var(--space-2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--space-4);
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    > * {
+      min-width: 0;
+      scroll-snap-align: start;
+    }
+  }
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+}
+
+.legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legend__swatch--base {
+  background: var(--chart-base);
+}
+
+.legend__swatch--scenario {
+  background: var(--chart-scenario);
+}
+
+.chart {
+  min-width: 0;
+}
+
+.chart svg {
+  display: block;
+}
+
+.chart__grid {
+  stroke: var(--color-surface-soft);
+  stroke-width: 1;
+}
+
+.chart__baseline {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.chart__zero {
+  stroke: var(--color-text-muted);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.chart__line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.chart__line--base {
+  stroke: var(--chart-base);
+  stroke-dasharray: 5 4;
+}
+
+.chart__line--scenario {
+  stroke: var(--chart-scenario);
+}
+
+.chart__axis-label,
+.chart__label {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.breakdown {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-sm);
+
+  li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    color: var(--color-text-muted);
+  }
+}
+
+.breakdown__total {
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+
+  span,
+  strong {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+}

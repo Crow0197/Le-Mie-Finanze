@@ -8,7 +8,7 @@
 
   <nav aria-label="Navigazione principale">
     <ul class="nav-list">
-      @for (item of desktopNavigation; track item.path) {
+      @for (item of navigation.items(); track item.id) {
         <li>
           <a
             class="nav-link"
@@ -65,7 +65,7 @@
 </div>
 
 <nav class="bottom-nav" aria-label="Navigazione principale">
-  @for (item of mobileNavigationStart; track item.path) {
+  @for (item of navigation.bottomStart(); track item.id) {
     <a
       class="bottom-nav__link"
       [routerLink]="item.path"
@@ -90,7 +90,7 @@
     <app-icon name="plus" [size]="28" [strokeWidth]="2.5" />
   </button>
 
-  @for (item of mobileNavigationEnd; track item.path) {
+  @for (item of navigation.bottomEnd(); track item.id) {
     <a
       class="bottom-nav__link"
       [routerLink]="item.path"
@@ -102,6 +102,11 @@
       {{ item.label }}
     </a>
   }
+
+  <a class="bottom-nav__link" routerLink="/altro" routerLinkActive="bottom-nav__link--active" ariaCurrentWhenActive="page">
+    <app-icon name="ellipsis" />
+    Altro
+  </a>
 </nav>
 
 <app-snackbar />

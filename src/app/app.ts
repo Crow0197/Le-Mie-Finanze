@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { AppUpdateService } from './core/pwa/app-update.service';
 import { InstallBanner } from './core/pwa/install-banner';
 import { TestModeBanner } from './core/test-mode/test-mode-banner';
 
@@ -9,4 +10,8 @@ import { TestModeBanner } from './core/test-mode/test-mode-banner';
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  constructor() {
+    inject(AppUpdateService).start();
+  }
+}

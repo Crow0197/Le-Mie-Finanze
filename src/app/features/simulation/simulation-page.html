@@ -1,0 +1,373 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Simulazione</h1>
+      <p class="page-header__subtitle">
+        Parti dalle operazioni che hai già in programma e prova a cambiare qualcosa: una spesa imprevista, una nuova rata
+        o un modo di vivere diverso.
+      </p>
+    </div>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <div class="alert alert--danger" role="alert">
+      <app-icon name="circle-alert" />
+      <div>
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+      </div>
+    </div>
+  }
+
+  @if (loading() && !errorMessage()) {
+    <div class="card section" aria-busy="true">
+      <p class="loading-indicator" role="status">Carico le tue operazioni…</p>
+      <app-skeleton height="180px" />
+    </div>
+  } @else if (!errorMessage()) {
+    <section class="card section" aria-labelledby="simulation-verdict-title">
+      <div class="section__header">
+        <h2 id="simulation-verdict-title">Rischi di andare in rosso?</h2>
+        <app-info-hint
+          label="Come funziona"
+          text="Parto dal saldo di oggi dei conti inclusi nel saldo totale e vado avanti giorno per giorno: aggiungo stipendi ed entrate ricorrenti, tolgo rate, spese fisse e operazioni già pianificate. Quello che scrivi qui sotto si aggiunge a tutto questo."
+        />
+      </div>
+
+      <div
+        class="alert sim-verdict"
+        role="status"
+        [class.alert--success]="risk().level === 'ok'"
+        [class.alert--warning]="risk().level === 'warning'"
+        [class.alert--danger]="risk().level === 'danger'"
+      >
+        <app-icon [name]="risk().level === 'ok' ? 'circle-check' : 'triangle-alert'" [size]="28" />
+        <div>
+          @switch (risk().level) {
+            @case ('danger') {
+              <p class="sim-verdict__title">Vai sotto zero il {{ risk().firstNegativeDate | localDate }}</p>
+              <p>
+                Il momento peggiore è il {{ risk().minDate | localDate }}: ti mancherebbero
+                {{ risk().missingCents | money }}.
+              </p>
+            }
+            @case ('warning') {
+              <p class="sim-verdict__title">Non vai sotto zero, ma ci passi vicino</p>
+              <p>
+                Il {{ risk().minDate | localDate }} resteresti con {{ risk().minCents | money }}:
+                {{ risk().missingCents | money }} sotto il margine di sicurezza di {{ risk().bufferCents | money }}.
+              </p>
+            }
+            @default {
+              <p class="sim-verdict__title">Non vai mai sotto zero</p>
+              <p>Il momento più basso è il {{ risk().minDate | localDate }}, con {{ risk().minCents | money }}.</p>
+            }
+          }
+          <p class="sim-verdict__note">
+            {{
+              hasScenario()
+                ? 'Con quello che hai già in programma più la simulazione qui sotto'
+                : 'Con gli stipendi, le rate e le spese fisse che hai già'
+            }}, dal {{ today | localDate }} al {{ endDate() | localDate }}.
+          </p>
+        </div>
+      </div>
+
+      <div class="sim-horizon">
+        <span class="field__label" id="simulation-horizon-label">Guarda avanti</span>
+        <div class="segmented" role="group" aria-labelledby="simulation-horizon-label">
+          @for (horizon of horizons; track horizon.months) {
+            <button
+              type="button"
+              class="segmented__option"
+              [attr.aria-pressed]="horizonMonths() === horizon.months"
+              (click)="horizonMonths.set(horizon.months)"
+            >
+              {{ horizon.label }}
+            </button>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="card section" aria-labelledby="simulation-scenario-title">
+      <div class="section__header">
+        <h2 id="simulation-scenario-title">Cosa vuoi provare</h2>
+        <button type="button" class="button button--secondary button--small" [disabled]="!hasScenario()" (click)="reset()">
+          Azzera
+        </button>
+      </div>
+      <p class="muted">Compila solo quello che ti interessa: i campi si possono anche combinare.</p>
+
+      <div class="sim-blocks">
+        <div class="sim-block">
+          <h3 class="sim-block__title">
+            <app-icon name="triangle-alert" />
+            Una spesa imprevista
+          </h3>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="simulation-one-off-amount">Importo (€)</label>
+              <input
+                id="simulation-one-off-amount"
+                class="field__control"
+                type="text"
+                inputmode="decimal"
+                placeholder="0,00"
+                [ngModel]="oneOffAmount()"
+                (ngModelChange)="oneOffAmount.set($event)"
+              />
+            </div>
+            <div class="field">
+              <label class="field__label" for="simulation-one-off-date">Quando</label>
+              <input
+                id="simulation-one-off-date"
+                class="field__control"
+                type="date"
+                [ngModel]="oneOffDate()"
+                (ngModelChange)="oneOffDate.set($event)"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="simulation-one-off-label">Descrizione</label>
+            <input
+              id="simulation-one-off-label"
+              class="field__control"
+              type="text"
+              [ngModel]="oneOffLabel()"
+              (ngModelChange)="oneOffLabel.set($event)"
+            />
+          </div>
+        </div>
+
+        <div class="sim-block">
+          <h3 class="sim-block__title">
+            <app-icon name="credit-card" />
+            Una nuova rata
+          </h3>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="simulation-instalment-amount">Importo al mese (€)</label>
+              <input
+                id="simulation-instalment-amount"
+                class="field__control"
+                type="text"
+                inputmode="decimal"
+                placeholder="0,00"
+                [ngModel]="instalmentAmount()"
+                (ngModelChange)="instalmentAmount.set($event)"
+              />
+            </div>
+            <div class="field">
+              <label class="field__label" for="simulation-instalment-day">Giorno</label>
+              <input
+                id="simulation-instalment-day"
+                class="field__control"
+                type="number"
+                min="1"
+                max="31"
+                [ngModel]="instalmentDay()"
+                (ngModelChange)="instalmentDay.set($event)"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="simulation-instalment-months">Per quanti mesi</label>
+            <select
+              id="simulation-instalment-months"
+              class="field__control"
+              [ngModel]="instalmentMonths()"
+              (ngModelChange)="instalmentMonths.set($event)"
+            >
+              <option [ngValue]="0">Tutto il periodo</option>
+              <option [ngValue]="6">6 mesi</option>
+              <option [ngValue]="12">12 mesi</option>
+              <option [ngValue]="24">24 mesi</option>
+              <option [ngValue]="36">36 mesi</option>
+            </select>
+            <p class="field__hint">Nei mesi più corti viene usato l'ultimo giorno valido.</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="simulation-instalment-label">Descrizione</label>
+            <input
+              id="simulation-instalment-label"
+              class="field__control"
+              type="text"
+              [ngModel]="instalmentLabel()"
+              (ngModelChange)="instalmentLabel.set($event)"
+            />
+          </div>
+        </div>
+
+        <div class="sim-block">
+          <h3 class="sim-block__title">
+            <app-icon name="shopping-cart" />
+            Un modo di vivere diverso
+          </h3>
+          <div class="field">
+            <label class="field__label" for="simulation-monthly-extra">Spese di tutti i giorni in più (€ al mese)</label>
+            <input
+              id="simulation-monthly-extra"
+              class="field__control"
+              type="text"
+              inputmode="decimal"
+              placeholder="0,00"
+              [ngModel]="monthlyExtraAmount()"
+              (ngModelChange)="monthlyExtraAmount.set($event)"
+            />
+            <p class="field__hint">Spalmate giorno per giorno: spesa, benzina, uscite.</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="simulation-salary-change">
+              Variazione dello stipendio (€ al mese)
+              <app-info-hint
+                label="Variazione dello stipendio"
+                text="Quanto cambia ogni stipendio del periodo. Metti il segno meno davanti per uno stipendio più basso, per esempio -150."
+              />
+            </label>
+            <input
+              id="simulation-salary-change"
+              class="field__control"
+              type="text"
+              inputmode="decimal"
+              placeholder="0,00"
+              [ngModel]="salaryChangeAmount()"
+              (ngModelChange)="salaryChangeAmount.set($event)"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="sim-results">
+      <div class="card stat">
+        <p class="stat__label">Se non cambia niente</p>
+        <p class="stat__value amount" [class.amount--negative]="result().baseEndCents < 0">
+          {{ result().baseEndCents | money }}
+        </p>
+        <p class="muted">Quanto ti resterebbe il {{ endDate() | localDate }} con quello che hai già in programma.</p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">Con la simulazione</p>
+        <p class="stat__value stat__value--hero amount" [class.amount--negative]="result().scenarioEndCents < 0">
+          {{ result().scenarioEndCents | money }}
+        </p>
+        <p class="muted">
+          @if (hasScenario()) {
+            Stesso periodo, aggiungendo quello che hai scritto qui sopra.
+          } @else {
+            Compila un campo qui sopra per vedere come cambia.
+          }
+        </p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">Differenza</p>
+        <p class="stat__value amount" [class.amount--negative]="result().differenceCents < 0">
+          {{ result().differenceCents | money }}
+        </p>
+        <p class="muted">Circa {{ result().monthlyImpactCents | money }} al mese.</p>
+      </div>
+      <div class="card stat">
+        <p class="stat__label">
+          Momento peggiore
+          <app-info-hint
+            label="Momento peggiore"
+            text="Il punto più basso che tocca il saldo durante il periodo: anche se alla fine torni in positivo, in quel giorno devi avere abbastanza soldi."
+          />
+        </p>
+        <p class="stat__value amount" [class.amount--negative]="result().minCents < 0">{{ result().minCents | money }}</p>
+        <p class="muted">il {{ result().minDate | localDate }}</p>
+      </div>
+    </div>
+
+    <section class="card section" aria-labelledby="simulation-chart-title">
+      <div class="section__header">
+        <h2 id="simulation-chart-title">Come va il saldo</h2>
+        <ul class="legend" aria-label="Legenda">
+          <li><span class="legend__swatch legend__swatch--base"></span>Senza cambiamenti</li>
+          <li><span class="legend__swatch legend__swatch--scenario"></span>Con la simulazione</li>
+        </ul>
+      </div>
+      <div
+        class="chart"
+        #chartHost
+        role="img"
+        [attr.aria-label]="
+          'Andamento del saldo dal ' +
+          (chart().startLabel | localDate) +
+          ' al ' +
+          (chart().endLabel | localDate) +
+          '. Alla fine ' +
+          (result().scenarioEndCents | money)
+        "
+      >
+        <svg
+          [attr.width]="chart().width"
+          [attr.height]="chart().totalHeight"
+          [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().totalHeight"
+        >
+          <line class="chart__grid" [attr.x1]="chart().axisWidth" [attr.x2]="chart().width" y1="0.5" y2="0.5" />
+          <line
+            class="chart__baseline"
+            [attr.x1]="chart().axisWidth"
+            [attr.x2]="chart().width"
+            [attr.y1]="chart().height"
+            [attr.y2]="chart().height"
+          />
+          @if (chart().showZero) {
+            <line
+              class="chart__zero"
+              [attr.x1]="chart().axisWidth"
+              [attr.x2]="chart().width"
+              [attr.y1]="chart().zeroY"
+              [attr.y2]="chart().zeroY"
+            />
+          }
+          <text class="chart__axis-label" [attr.x]="chart().axisWidth - 8" y="12" text-anchor="end">
+            {{ chart().maxCents | money }}
+          </text>
+          <text class="chart__axis-label" [attr.x]="chart().axisWidth - 8" [attr.y]="chart().height" text-anchor="end">
+            {{ chart().minCents | money }}
+          </text>
+          <path class="chart__line chart__line--base" [attr.d]="chart().basePath" />
+          <path class="chart__line chart__line--scenario" [attr.d]="chart().scenarioPath" />
+          <text class="chart__label" [attr.x]="chart().axisWidth" [attr.y]="chart().height + 18">
+            {{ chart().startLabel | localDate }}
+          </text>
+          <text class="chart__label" [attr.x]="chart().width" [attr.y]="chart().height + 18" text-anchor="end">
+            {{ chart().endLabel | localDate }}
+          </text>
+        </svg>
+      </div>
+    </section>
+
+    @if (hasScenario()) {
+      <section class="card section" aria-labelledby="simulation-detail-title">
+        <h2 id="simulation-detail-title">Cosa ho aggiunto</h2>
+        <ul class="breakdown">
+          @for (item of scenarioSummary(); track item.description) {
+            <li>
+              <span>
+                {{ item.description }}
+                <span class="muted">· {{ item.count }} {{ item.count === 1 ? 'volta' : 'volte' }}</span>
+              </span>
+              <strong class="amount" [class.amount--negative]="item.amountCents < 0">{{ item.amountCents | money }}</strong>
+            </li>
+          }
+          <li class="breakdown__total">
+            <span>Totale nel periodo</span>
+            <strong class="amount" [class.amount--negative]="result().scenarioTotalCents < 0">
+              {{ result().scenarioTotalCents | money }}
+            </strong>
+          </li>
+        </ul>
+      </section>
+    }
+
+    <p class="muted">
+      La simulazione parte dal saldo di oggi dei conti inclusi nel saldo totale e conta stipendi, spese fisse e
+      operazioni già pianificate fino al {{ endDate() | localDate }}. Non modifica nulla: è solo una prova.
+    </p>
+  }
+</section>

@@ -5,13 +5,15 @@
 
   <nav class="card more__card" aria-label="Altre sezioni">
     <ul class="more__list">
-      @for (link of links; track link.path) {
+      @for (link of navigation.moreItems(); track link.id) {
         <li>
           <a class="more__link" [routerLink]="link.path">
             <app-icon [name]="link.icon" />
             {{ link.label }}
           </a>
         </li>
+      } @empty {
+        <li class="muted">Tutte le sezioni sono già nella barra in basso.</li>
       }
     </ul>
   </nav>
@@ -57,4 +59,6 @@
       Esci
     </button>
   </section>
+
+  <p class="muted">Versione {{ appVersion }}</p>
 </section>
