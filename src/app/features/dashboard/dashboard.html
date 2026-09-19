@@ -102,8 +102,11 @@
           {{ cycleEnd().balanceCents | money }}
         </p>
         <p class="muted">
-          {{ cycleDaily().dailyCents | money }} al giorno per {{ cycleDaily().days }}
+          Puoi spendere {{ cycleDaily().dailyCents | money }} al giorno per {{ cycleDaily().days }}
           {{ cycleDaily().days === 1 ? 'giorno' : 'giorni' }}, fino al {{ cycleEnd().endDate | localDate }}
+          @if (cycleDaily().keepsBuffer) {
+            , lasciando intatto il margine di sicurezza
+          }
         </p>
         <ul class="breakdown">
           <li>

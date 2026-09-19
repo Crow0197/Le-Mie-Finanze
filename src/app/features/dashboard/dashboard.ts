@@ -249,11 +249,19 @@ export class Dashboard {
       .slice(0, 2);
   });
 
-  /** Quanto resta al giorno da oggi alla fine del ciclo. */
+  /**
+   * Ritmo di spesa che porta alla fine del ciclo senza intaccare il margine di sicurezza:
+   * quello che resta dopo le scadenze già note, diviso i giorni che mancano.
+   */
   protected readonly cycleDaily = computed(() => {
     const { endDate, balanceCents } = this.cycleEnd();
+    const bufferCents = this.store.settings()?.safetyBufferCents ?? 0;
     const days = Math.max(1, daysBetween(this.today(), endDate) + 1);
-    return { days, dailyCents: Math.floor(Math.max(0, balanceCents) / days) };
+    return {
+      days,
+      keepsBuffer: bufferCents > 0,
+      dailyCents: Math.floor(Math.max(0, balanceCents - bufferCents) / days),
+    };
   });
 
   /**
