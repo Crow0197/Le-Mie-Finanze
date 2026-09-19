@@ -1,2 +1,2 @@
 /** Aggiornata dal workflow di rilascio: non modificarla a mano. */
-export const APP_VERSION = '3.1.0';
+export const APP_VERSION = '3.2.0';
