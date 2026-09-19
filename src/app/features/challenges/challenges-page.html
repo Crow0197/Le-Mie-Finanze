@@ -1,0 +1,223 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Sfide</h1>
+      <p class="page-header__subtitle">
+        Gli stessi numeri di sempre, presi per il verso divertente. Tutto calcolato dai tuoi movimenti: niente è finto.
+      </p>
+    </div>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <div class="alert alert--danger" role="alert">
+      <app-icon name="circle-alert" />
+      <div>
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+      </div>
+    </div>
+  }
+
+  @if (loading() && !errorMessage()) {
+    <div class="card section" aria-busy="true">
+      <p class="loading-indicator" role="status">Conto i punti…</p>
+      <app-skeleton height="160px" />
+    </div>
+  } @else if (!errorMessage()) {
+    @if (!hasData()) {
+      <div class="card">
+        <app-empty-state
+          icon="star"
+          heading="Ancora niente da sfidare"
+          description="Registra qualche movimento: da lì nascono le serie, i primati e i punti."
+        />
+      </div>
+    } @else {
+      <section class="card level" aria-labelledby="level-title">
+        <div class="level__crown"><app-icon name="star" [size]="28" /></div>
+        <div class="level__body">
+          <p class="stat__label" id="level-title">Il tuo livello</p>
+          <h2 class="level__name">{{ result().level.name }}</h2>
+          <p class="muted">{{ result().points }} punti · {{ unlocked().length }} obiettivi su {{ result().achievements.length }}</p>
+          <div
+            class="progress"
+            role="progressbar"
+            [attr.aria-valuenow]="levelProgress().percent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Avanzamento verso il livello successivo"
+          >
+            <div class="progress__bar" [style.width.%]="levelProgress().percent"></div>
+          </div>
+          @if (result().level.nextPoints !== null) {
+            <p class="muted">Ti mancano {{ levelProgress().missing }} punti per il livello successivo.</p>
+          } @else {
+            <p class="muted">Hai raggiunto il livello massimo. Complimenti sinceri.</p>
+          }
+        </div>
+      </section>
+
+      <section class="card section" aria-labelledby="weekly-title">
+        <div class="section__header">
+          <h2 id="weekly-title">La sfida della settimana</h2>
+          <app-info-hint
+            label="Come nasce l'obiettivo"
+            text="È il 10% in meno di quanto hai speso in media nelle quattro settimane precedenti, contando solo le spese decise da te: rate, abbonamenti e trasferimenti restano fuori."
+          />
+        </div>
+        @if (result().weekly.targetCents > 0) {
+          <p class="stat__value amount" [class.amount--negative]="!result().weekly.won">
+            {{ result().weekly.spentCents | money }}
+          </p>
+          <p class="muted">negli ultimi 7 giorni, contro un obiettivo di {{ result().weekly.targetCents | money }}</p>
+          <div
+            class="progress"
+            role="progressbar"
+            [attr.aria-valuenow]="weeklyPercent()"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Spesa della settimana rispetto all'obiettivo"
+          >
+            <div class="progress__bar" [class.progress__bar--danger]="!result().weekly.won" [style.width.%]="weeklyPercent()"></div>
+          </div>
+          <p>
+            {{
+              result().weekly.won
+                ? 'Per ora stai vincendo: continua così e chiudi la settimana sotto la tua media.'
+                : 'Per ora stai perdendo: da qui a fine settimana ogni spesa in meno conta.'
+            }}
+          </p>
+        } @else {
+          <p class="muted">Servono almeno quattro settimane di storico per fissare un obiettivo sensato.</p>
+        }
+      </section>
+
+      <div class="grid grid--3">
+        <div class="card stat">
+          <p class="stat__label">Giorni senza spendere</p>
+          <p class="stat__value stat__value--hero">{{ result().streak.days }}</p>
+          <p class="muted">
+            Rate e abbonamenti non contano. Il tuo record è {{ result().streak.record }}
+            {{ result().streak.record === 1 ? 'giorno' : 'giorni' }}.
+          </p>
+        </div>
+
+        <div class="card stat">
+          <p class="stat__label">Le spese che «non sono niente»</p>
+          <p class="stat__value">{{ result().smallSpends.countedCents | money }}</p>
+          <p class="muted">
+            {{ result().smallSpends.count }} spese sotto i 10 € questo mese. Messe insieme, però, si sentono.
+          </p>
+        </div>
+
+        @if (result().habit; as habit) {
+          <div class="card stat">
+            <p class="stat__label">La tua abitudine più costosa</p>
+            <p class="stat__value">{{ habit.yearlyCents | money }}</p>
+            <p class="muted">
+              all'anno in «{{ habit.name }}», a questo ritmo: {{ habit.count }} volte negli ultimi tre mesi.
+            </p>
+          </div>
+        }
+
+        <div class="card stat">
+          <p class="stat__label">Duello col mese scorso</p>
+          <p
+            class="stat__value amount"
+            [class.amount--positive]="result().duel.differenceCents < 0"
+            [class.amount--negative]="result().duel.differenceCents > 0"
+          >
+            {{ result().duel.differenceCents > 0 ? '+' : '' }}{{ result().duel.differenceCents | money }}
+          </p>
+          <p class="muted">
+            {{ result().duel.currentCents | money }} finora, contro {{ result().duel.previousCents | money }} allo stesso
+            giorno del mese scorso.
+          </p>
+        </div>
+
+        @if (result().wildest; as wildest) {
+          <div class="card stat">
+            <p class="stat__label">La spesa più folle del mese</p>
+            <p class="stat__value amount amount--negative">{{ wildest.amountCents | money }}</p>
+            <p class="muted">{{ wildest.description }} · {{ wildest.categoryName }} · {{ wildest.date | localDate }}</p>
+          </div>
+        }
+
+        @if (result().worstDay; as worstDay) {
+          <div class="card stat">
+            <p class="stat__label">Il giorno più caro</p>
+            <p class="stat__value amount amount--negative">{{ worstDay.amountCents | money }}</p>
+            <p class="muted">tutto in un giorno solo, il {{ worstDay.date | localDate }}.</p>
+          </div>
+        }
+
+        <div class="card stat">
+          <p class="stat__label">
+            Quanto respiri
+            <app-info-hint
+              label="Mesi di autonomia"
+              text="Quanti mesi potresti andare avanti con quello che hai sui conti se domani sparissero le entrate, alle tue spese medie degli ultimi mesi chiusi."
+            />
+          </p>
+          @if (result().runwayMonths !== null) {
+            <p class="stat__value stat__value--hero">{{ result().runwayMonths }}</p>
+            <p class="muted">
+              mesi di autonomia. Sotto 1 sei in bilico, sopra 3 puoi dormire, sopra 6 puoi permetterti un imprevisto
+              serio.
+            </p>
+          } @else {
+            <p class="stat__value">—</p>
+            <p class="muted">Serve almeno un mese chiuso di spese per calcolarlo.</p>
+          }
+        </div>
+
+        @if (result().subscriptions.items.length > 0) {
+          <div class="card stat">
+            <p class="stat__label">Abbonamenti e rate, in un anno</p>
+            <p class="stat__value amount amount--negative">{{ result().subscriptions.yearlyCents | money }}</p>
+            <ul class="breakdown">
+              @for (item of result().subscriptions.items.slice(0, 5); track item.name) {
+                <li>
+                  <span>{{ item.name }}</span>
+                  <strong class="amount">{{ item.yearlyCents | money }}</strong>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+
+      <section class="card section" aria-labelledby="achievements-title">
+        <div class="section__header">
+          <h2 id="achievements-title">Obiettivi</h2>
+          <app-info-hint
+            label="Come funzionano"
+            text="Non sono premi finti: ognuno si sblocca da solo quando i tuoi movimenti dicono che è successo davvero, e si ricalcola ogni volta che apri la pagina."
+          />
+        </div>
+        <ul class="achievements">
+          @for (achievement of unlocked(); track achievement.id) {
+            <li class="achievement achievement--unlocked">
+              <span class="achievement__icon"><app-icon name="circle-check" [size]="20" /></span>
+              <div>
+                <strong>{{ achievement.name }}</strong>
+                <p class="muted">{{ achievement.description }}</p>
+              </div>
+              <span class="achievement__points">+{{ achievement.points }}</span>
+            </li>
+          }
+          @for (achievement of locked(); track achievement.id) {
+            <li class="achievement">
+              <span class="achievement__icon"><app-icon name="star" [size]="20" /></span>
+              <div>
+                <strong>{{ achievement.name }}</strong>
+                <p class="muted">{{ achievement.description }}</p>
+              </div>
+              <span class="achievement__points">{{ achievement.points }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</section>

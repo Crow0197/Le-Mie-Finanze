@@ -70,6 +70,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/advice/advice-page').then((m) => m.AdvicePage),
       },
       {
+        path: 'sfide',
+        title: 'Sfide',
+        loadComponent: () => import('./features/challenges/challenges-page').then((m) => m.ChallengesPage),
+      },
+      {
         path: 'conti',
         title: 'Conti',
         loadComponent: () => import('./features/accounts/accounts-page').then((m) => m.AccountsPage),
