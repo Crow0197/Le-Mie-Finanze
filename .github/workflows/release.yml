@@ -28,7 +28,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
@@ -71,18 +71,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create v${{ steps.versione.outputs.versione }} --target release/v${{ steps.versione.outputs.versione }} --title "v${{ steps.versione.outputs.versione }}" --generate-notes
 
-      # Allinea regole e indici Firestore al codice appena pubblicato.
-      # Se fallisce per permessi: nella console Google Cloud dare al service account del deploy
-      # i ruoli "Firebase Rules Admin" e "Cloud Datastore Index Admin".
-      - name: Pubblica regole e indici Firestore
-        continue-on-error: true
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LE_MIE_FINANZE_9280F }}
-        run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-key.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-key.json"
-          npx --yes firebase-tools deploy --only firestore --project le-mie-finanze-9280f --non-interactive
-
+      # Le regole e gli indici Firestore si pubblicano a mano con "firebase deploy --only firestore":
+      # il service account del deploy ha i permessi per il solo Hosting.
       - name: Controllo qualità e PWA
         continue-on-error: true
         uses: treosh/lighthouse-ci-action@v12
