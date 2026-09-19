@@ -39,14 +39,19 @@
       </div>
     }
 
-    @if (available(); as availability) {
-      @if (availability.deficitCents > 0) {
-        <p class="alert alert--warning" role="status">
-          <app-icon name="triangle-alert" />
-          Attenzione: prima dello stipendio rischi di superare il margine di sicurezza di
-          {{ availability.deficitCents | money }}.
-        </p>
-      }
+    @for (item of advice(); track item.id) {
+      <a
+        class="alert dashboard__advice"
+        [class.alert--danger]="item.level === 'danger'"
+        [class.alert--warning]="item.level === 'warning'"
+        routerLink="/consigli"
+      >
+        <app-icon [name]="item.level === 'danger' ? 'triangle-alert' : 'circle-alert'" />
+        <span>
+          <strong>{{ item.title }}</strong>
+          {{ item.detail }}
+        </span>
+      </a>
     }
 
     @if (dueCount() > 0) {

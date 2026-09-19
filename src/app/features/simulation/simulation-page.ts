@@ -9,7 +9,7 @@ import { calculateNetWorthCents } from '../../domain/forecast/balances';
 import { buildVirtualOccurrences, toForecastEntry } from '../../domain/forecast/forecast';
 import { parseAmountToCents, parseSignedAmountToCents } from '../../domain/money/money';
 import { Transaction } from '../../domain/models/transaction';
-import { SimulationEntry, monthlyDates, simulate } from '../../domain/simulation/simulation';
+import { SimulationEntry, monthlyDates, simulate, toSimulationEntries } from '../../domain/simulation/simulation';
 import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Icon } from '../../shared/ui/icon/icon';
@@ -77,12 +77,7 @@ export class SimulationPage {
       .filter((transaction) => transaction.effectiveDate > this.today && transaction.effectiveDate <= end)
       .map((transaction) => toForecastEntry(transaction, this.salaryRuleIds()));
     const virtual = buildVirtualOccurrences(this.store.rules(), addDaysToLocalDate(this.today, 1), end, storedKeys);
-    return [...stored, ...virtual].map((entry) => ({
-      date: entry.date,
-      description: entry.description,
-      amountCents:
-        entry.type === 'income' ? entry.amountCents : entry.type === 'expense' ? -entry.amountCents : -(entry.feeCents ?? 0),
-    }));
+    return toSimulationEntries([...stored, ...virtual]);
   });
 
   /** Dates of the salaries inside the period, used by the "salary change" scenario. */

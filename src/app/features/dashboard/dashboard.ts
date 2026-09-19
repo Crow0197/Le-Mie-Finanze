@@ -12,6 +12,7 @@ import {
   startOfMonthDate,
   todayInTimeZone,
 } from '../../domain/dates/local-date';
+import { buildAdvice, monthlyAmountCents } from '../../domain/advice/advice';
 import { calculateAvailableCents, calculateNetWorthCents } from '../../domain/forecast/balances';
 import { resolveSalaryCycleRange } from '../../domain/forecast/salary-cycle';
 import {
@@ -23,6 +24,7 @@ import {
 } from '../../domain/forecast/forecast';
 import { Transaction } from '../../domain/models/transaction';
 import { VIEW_PERIOD_LABELS, ViewPeriodPreset } from '../../domain/models/user-settings';
+import { simulate, toSimulationEntries } from '../../domain/simulation/simulation';
 import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { EmptyState } from '../../shared/ui/empty-state/empty-state';
@@ -225,6 +227,45 @@ export class Dashboard {
       items,
       balanceCents: this.netWorthCents() + incomeCents - recurringExpenseCents - otherExpenseCents,
     };
+  });
+
+  /**
+   * Le due osservazioni più serie della pagina Consigli, calcolate solo sui dati che il Riepilogo ha già.
+   * Le operazioni scadute hanno già il loro avviso qui sopra, quindi non le conto due volte.
+   */
+  protected readonly advice = computed(() => {
+    const today = this.today();
+    const { endDate, hasSalary } = this.cycle();
+    const forecast = simulate(
+      this.netWorthCents(),
+      toSimulationEntries([
+        ...this.plannedEntries().filter((entry) => entry.date > today && entry.date <= endDate),
+        ...buildVirtualOccurrences(this.store.rules(), addDaysToLocalDate(today, 1), endDate, this.storedKeys()),
+      ]),
+      [],
+      today,
+      endDate,
+    );
+    const active = this.store.rules().filter((rule) => rule.status === 'active');
+    const expenses = active.filter((rule) => rule.transactionType === 'expense');
+    return buildAdvice({
+      today,
+      hasSalary,
+      safetyBufferCents: this.store.settings()?.safetyBufferCents ?? 0,
+      cycleEndCents: forecast.baseEndCents,
+      cycleMinCents: forecast.minCents,
+      cycleMinDate: forecast.minDate,
+      cycleEndDate: endDate,
+      salaryMonthlyCents: active
+        .filter((rule) => rule.kind === 'salary')
+        .reduce((total, rule) => total + monthlyAmountCents(rule), 0),
+      commitmentsMonthlyCents: expenses.reduce((total, rule) => total + monthlyAmountCents(rule), 0),
+      commitmentsCount: expenses.length,
+      duePlannedCount: 0,
+      pausedRulesCount: this.store.rules().filter((rule) => rule.status === 'paused').length,
+    })
+      .filter((item) => item.level === 'danger' || item.level === 'warning')
+      .slice(0, 2);
   });
 
   protected readonly upcoming = computed(() => {

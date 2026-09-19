@@ -1,0 +1,93 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Consigli</h1>
+      <p class="page-header__subtitle">
+        Quello che i tuoi numeri dicono davvero, senza addolcire la pillola.
+      </p>
+    </div>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <div class="alert alert--danger" role="alert">
+      <app-icon name="circle-alert" />
+      <div>
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary button--small" (click)="load()">Riprova</button>
+      </div>
+    </div>
+  }
+
+  @if (loading() && !errorMessage()) {
+    <div class="card section" aria-busy="true">
+      <p class="loading-indicator" role="status">Guardo i tuoi movimenti…</p>
+      <app-skeleton height="140px" />
+    </div>
+  } @else if (!errorMessage()) {
+    <div class="card section">
+      <div class="section__header">
+        <h2>{{ headline() }}</h2>
+        <app-info-hint
+          label="Come funziona"
+          text="Sono controlli fissi sui tuoi dati: confronto il mese in corso con i tre mesi chiusi precedenti, peso le ricorrenze sullo stipendio e seguo il saldo giorno per giorno fino al prossimo accredito. Nessuna stima magica: se un numero non c'è, il controllo viene saltato."
+        />
+      </div>
+      <p class="muted">
+        Aggiornato al {{ today() | localDate }} · {{ advice().length }}
+        {{ advice().length === 1 ? 'osservazione' : 'osservazioni' }}
+      </p>
+    </div>
+
+    @for (item of advice(); track item.id) {
+      <article
+        class="card advice"
+        [class.advice--danger]="item.level === 'danger'"
+        [class.advice--warning]="item.level === 'warning'"
+        [class.advice--good]="item.level === 'good'"
+      >
+        <span class="advice__icon"><app-icon [name]="levelIcons[item.level]" [size]="22" /></span>
+        <div class="advice__body">
+          <p class="advice__topic">{{ topicLabels[item.topic] }}</p>
+          <h3 class="advice__title">{{ item.title }}</h3>
+          <p>{{ item.detail }}</p>
+          @if (item.action) {
+            <p class="advice__action">{{ item.action }}</p>
+          }
+          @if (item.link; as link) {
+            <a class="button button--secondary button--small" [routerLink]="link.path">{{ link.label }}</a>
+          }
+        </div>
+      </article>
+    } @empty {
+      <div class="card">
+        <p class="muted">
+          Servono almeno qualche movimento e una ricorrenza configurata prima che possa dirti qualcosa di sensato.
+        </p>
+      </div>
+    }
+
+    @if (commitmentsDetail().length > 0) {
+      <section class="card section" aria-labelledby="advice-commitments-title">
+        <h2 id="advice-commitments-title">Cosa esce ogni mese comunque vada</h2>
+        <p class="muted">Ricorrenze attive riportate al mese: le annuali divise per dodici, le settimanali moltiplicate.</p>
+        <ul class="breakdown">
+          @for (item of commitmentsDetail(); track item.name) {
+            <li>
+              <span>{{ item.name }}</span>
+              <strong class="amount">{{ item.monthlyCents | money }}</strong>
+            </li>
+          }
+          <li class="breakdown__total">
+            <span>Totale al mese</span>
+            <strong class="amount">{{ input().commitmentsMonthlyCents | money }}</strong>
+          </li>
+        </ul>
+      </section>
+    }
+
+    <p class="muted">
+      Sono osservazioni sui dati che hai inserito tu: se manca qualcosa, mancherà anche qui. Non sono una consulenza
+      finanziaria e non tengono conto della tua situazione fuori da questa app.
+    </p>
+  }
+</section>

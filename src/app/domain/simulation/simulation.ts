@@ -1,4 +1,5 @@
 import { addDaysToLocalDate, daysBetween } from '../dates/local-date';
+import { ForecastEntry } from '../forecast/forecast';
 
 /** A signed movement on a day: positive for income, negative for expenses. */
 export interface SimulationEntry {
@@ -28,6 +29,16 @@ export interface SimulationResult {
   monthlyImpactCents: number;
   /** Total of the scenario movements. */
   scenarioTotalCents: number;
+}
+
+/** Le voci di previsione diventano movimenti firmati: le spese e le commissioni in negativo. */
+export function toSimulationEntries(entries: readonly ForecastEntry[]): SimulationEntry[] {
+  return entries.map((entry) => ({
+    date: entry.date,
+    description: entry.description,
+    amountCents:
+      entry.type === 'income' ? entry.amountCents : entry.type === 'expense' ? -entry.amountCents : -(entry.feeCents ?? 0),
+  }));
 }
 
 /**

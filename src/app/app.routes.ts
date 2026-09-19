@@ -65,6 +65,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/simulation/simulation-page').then((m) => m.SimulationPage),
       },
       {
+        path: 'consigli',
+        title: 'Consigli',
+        loadComponent: () => import('./features/advice/advice-page').then((m) => m.AdvicePage),
+      },
+      {
         path: 'conti',
         title: 'Conti',
         loadComponent: () => import('./features/accounts/accounts-page').then((m) => m.AccountsPage),
