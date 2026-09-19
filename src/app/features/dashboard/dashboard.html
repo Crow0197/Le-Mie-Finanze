@@ -10,8 +10,8 @@
 
   @if (!store.loaded() || (loading() && !errorMessage())) {
     <p class="loading-indicator" role="status">Carico la tua situazione…</p>
-    <div class="grid grid--3" aria-busy="true">
-      @for (item of [1, 2, 3]; track item) {
+    <div class="grid grid--2" aria-busy="true">
+      @for (item of [1, 2]; track item) {
         <div class="card stat">
           <app-skeleton width="50%" height="14px" />
           <app-skeleton width="70%" height="32px" />
@@ -62,7 +62,7 @@
       </a>
     }
 
-    <div class="grid grid--3">
+    <div class="grid grid--2">
       <div class="card stat">
         <p class="stat__label">
           Saldo totale
@@ -90,77 +90,21 @@
         </ul>
       </div>
 
-      <div class="card stat stat--wide">
-        <p class="stat__label">
-          Fino al prossimo stipendio
-          <app-info-hint
-            label="Fino al prossimo stipendio"
-            text="Quanto puoi ancora spendere prima del prossimo accredito. Parte dai soldi che hai adesso sui conti spendibili, toglie le spese fisse e le operazioni già programmate fino a quel giorno, e il margine di sicurezza. Cala a ogni spesa che registri."
-          />
-        </p>
-        @if (available(); as availability) {
-          <p class="stat__value amount">{{ availability.availableCents | money }}</p>
-          <p class="muted">
-            {{ availability.dailyCents | money }} al giorno per {{ availability.daysRemaining }}
-            {{ availability.daysRemaining === 1 ? 'giorno' : 'giorni' }}, fino al {{ nextSalary()?.date | localDate }}
-          </p>
-          <ul class="breakdown">
-            <li>
-              <span>Parti da (conti spendibili)</span>
-              <strong class="amount">{{ availability.startingCents | money }}</strong>
-            </li>
-            @if (availability.incomeCents > 0) {
-              <li>
-                <span>Entrate in arrivo</span>
-                <strong class="amount amount--positive">+{{ availability.incomeCents | money }}</strong>
-              </li>
-            }
-            <li>
-              <span>Spese fisse e pianificate</span>
-              <strong class="amount amount--negative">−{{ availability.expenseCents | money }}</strong>
-            </li>
-            @if (availability.safetyBufferCents > 0) {
-              <li>
-                <span>Margine di sicurezza</span>
-                <strong class="amount amount--negative">−{{ availability.safetyBufferCents | money }}</strong>
-              </li>
-            }
-            <li class="breakdown__total">
-              <span>Ti restano</span>
-              <strong class="amount">{{ availability.availableCents | money }}</strong>
-            </li>
-          </ul>
-          <details class="breakdown__details">
-            <summary>Quali operazioni ho contato</summary>
-            <ul class="breakdown">
-              @for (item of beforeSalaryItems(); track $index) {
-                <li>
-                  <span>{{ item.date | localDate }} · {{ item.description }}</span>
-                  <strong class="amount" [class.amount--positive]="item.type === 'income'">
-                    {{ item.type === 'income' ? '+' : '−' }}{{ item.amountCents | money }}
-                  </strong>
-                </li>
-              }
-            </ul>
-          </details>
-        } @else {
-          <p class="muted">Configura lo stipendio per sapere quanto puoi spendere fino al prossimo accredito.</p>
-          <a class="button button--secondary button--small dashboard__cta" routerLink="/pianificate">Configura stipendio</a>
-        }
-      </div>
-
       <div class="card stat">
         <p class="stat__label">
-          {{ cycleEnd().hasSalary ? 'Prima del prossimo stipendio' : 'A fine mese' }} ti resterebbero
+          {{ cycleEnd().hasSalary ? 'Fino al prossimo stipendio' : 'Fino a fine mese' }}
           <app-info-hint
-            label="Quanto ti resta prima del prossimo stipendio"
-            text="Parte dal saldo di oggi e toglie tutto quello che deve ancora succedere prima del prossimo accredito: rate, abbonamenti e altre operazioni già programmate. Le spese che hai già fatto sono dentro il saldo di oggi, quindi non vengono tolte due volte."
+            label="Fino al prossimo stipendio"
+            text="Parte dal saldo di oggi e toglie tutto quello che deve ancora succedere prima del prossimo accredito: rate, abbonamenti e operazioni già programmate. Le spese che hai già fatto sono dentro il saldo di oggi, quindi non vengono tolte due volte."
           />
         </p>
-        <p class="stat__value amount" [class.amount--negative]="cycleEnd().balanceCents < 0">
+        <p class="stat__value stat__value--hero amount" [class.amount--negative]="cycleEnd().balanceCents < 0">
           {{ cycleEnd().balanceCents | money }}
         </p>
-        <p class="muted">sui conti il {{ cycleEnd().endDate | localDate }}</p>
+        <p class="muted">
+          {{ cycleDaily().dailyCents | money }} al giorno per {{ cycleDaily().days }}
+          {{ cycleDaily().days === 1 ? 'giorno' : 'giorni' }}, fino al {{ cycleEnd().endDate | localDate }}
+        </p>
         <ul class="breakdown">
           <li>
             <span>Saldo di oggi</span>
@@ -183,10 +127,21 @@
             </li>
           }
           <li class="breakdown__total">
-            <span>Ti resterebbero</span>
+            <span>Ti restano</span>
             <strong class="amount">{{ cycleEnd().balanceCents | money }}</strong>
           </li>
         </ul>
+        @if (spendableNote(); as note) {
+          <p class="muted">
+            Di questi puoi spenderne davvero {{ note.availableCents | money }}:
+            @if (note.safetyBufferCents > 0) {
+              il margine di sicurezza di {{ note.safetyBufferCents | money }} resta da parte
+            }
+            @if (note.excludedNames) {
+              e {{ note.excludedNames }} {{ note.safetyBufferCents > 0 ? 'non conta' : 'non contano' }} tra i soldi spendibili
+            }
+          </p>
+        }
         <details class="breakdown__details">
           <summary>Quali scadenze ci sono da qui al {{ cycleEnd().endDate | localDate }}</summary>
           @if (cycleEnd().items.length === 0) {
@@ -208,6 +163,9 @@
           Dal {{ cycleEnd().startDate | localDate }} hai già speso {{ cycleEnd().spentSoFarCents | money }}, già tolti dal
           saldo di oggi. Risparmio previsto nel mese di calendario: {{ monthForecast().netCents | money }}.
         </p>
+        @if (!cycleEnd().hasSalary) {
+          <a class="button button--secondary button--small dashboard__cta" routerLink="/pianificate">Configura stipendio</a>
+        }
       </div>
     </div>
 

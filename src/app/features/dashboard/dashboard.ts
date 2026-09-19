@@ -8,6 +8,7 @@ import { ViewPeriodService } from '../../core/state/view-period.service';
 import { TransactionRepository } from '../../data-access/repositories/transaction.repository';
 import {
   addDaysToLocalDate,
+  daysBetween,
   endOfMonthDate,
   startOfMonthDate,
   todayInTimeZone,
@@ -141,26 +142,6 @@ export class Dashboard {
     });
   });
 
-  /** Operations counted by the "until salary" card, so the total can be checked item by item. */
-  protected readonly beforeSalaryItems = computed(() => {
-    const salary = this.nextSalary();
-    if (!salary) {
-      return [];
-    }
-    const today = this.today();
-    return [
-      ...this.plannedEntries().filter((entry) => entry.date < salary.date && !entry.isSalary),
-      ...buildVirtualOccurrences(
-        this.store.rules(),
-        today,
-        addDaysToLocalDate(salary.date, -1),
-        this.storedKeys(),
-      ).filter((entry) => !entry.isSalary),
-    ]
-      .filter((entry) => entry.type !== 'transfer')
-      .sort((a, b) => a.date.localeCompare(b.date));
-  });
-
   protected readonly monthForecast = computed(() => {
     const today = this.today();
     const monthEnd = endOfMonthDate(today);
@@ -266,6 +247,33 @@ export class Dashboard {
     })
       .filter((item) => item.level === 'danger' || item.level === 'warning')
       .slice(0, 2);
+  });
+
+  /** Quanto resta al giorno da oggi alla fine del ciclo. */
+  protected readonly cycleDaily = computed(() => {
+    const { endDate, balanceCents } = this.cycleEnd();
+    const days = Math.max(1, daysBetween(this.today(), endDate) + 1);
+    return { days, dailyCents: Math.floor(Math.max(0, balanceCents) / days) };
+  });
+
+  /**
+   * La cifra davvero spendibile, mostrata solo quando è diversa dal totale della card:
+   * succede con un margine di sicurezza impostato o con conti esclusi dal denaro disponibile.
+   */
+  protected readonly spendableNote = computed(() => {
+    const availability = this.available();
+    if (!availability || availability.availableCents === this.cycleEnd().balanceCents) {
+      return null;
+    }
+    return {
+      availableCents: availability.availableCents,
+      safetyBufferCents: availability.safetyBufferCents,
+      excludedNames: this.store
+        .activeAccounts()
+        .filter((account) => account.includeInNetWorth && !account.includeInAvailable)
+        .map((account) => account.name)
+        .join(', '),
+    };
   });
 
   protected readonly upcoming = computed(() => {
