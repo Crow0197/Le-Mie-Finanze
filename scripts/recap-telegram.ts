@@ -1,0 +1,147 @@
+/**
+ * Invia su Telegram un riepilogo giornaliero: saldo spendibile, scadenze di oggi
+ * e quanto resta fino al prossimo stipendio.
+ *
+ * Riusa gli stessi moduli di dominio (framework-agnostic, gli stessi della Dashboard)
+ * così i numeri nel messaggio coincidono sempre con quelli dell'app.
+ *
+ * Eseguito da .github/workflows/recap-giornaliero.yml, programmato due volte al giorno
+ * (7:00 e 8:00 UTC) per restare alle 9 di mattina a Roma sia in ora solare che legale:
+ * questo script controlla l'ora locale ed esce subito se non è il momento giusto.
+ */
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { addDaysToLocalDate, APP_TIME_ZONE, formatLocalDate, todayInTimeZone } from '../src/app/domain/dates/local-date';
+import { calculateAvailableCents } from '../src/app/domain/forecast/balances';
+import {
+  buildVirtualOccurrences,
+  calculateAvailableUntilSalary,
+  findNextSalary,
+  toForecastEntry,
+} from '../src/app/domain/forecast/forecast';
+import { formatCents } from '../src/app/domain/money/money';
+import type { Account } from '../src/app/domain/models/account';
+import type { RecurringRule } from '../src/app/domain/models/recurring-rule';
+import type { Transaction } from '../src/app/domain/models/transaction';
+
+const TARGET_HOUR = '09';
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Variabile d'ambiente mancante: ${name}`);
+  }
+  return value;
+}
+
+function currentHourInRome(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: APP_TIME_ZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).format(new Date());
+}
+
+async function sendTelegramMessage(text: string): Promise<void> {
+  const token = requireEnv('TELEGRAM_BOT_TOKEN');
+  const chatId = requireEnv('TELEGRAM_CHAT_ID');
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+  });
+  if (!response.ok) {
+    throw new Error(`Telegram ha risposto ${response.status}: ${await response.text()}`);
+  }
+}
+
+async function main(): Promise<void> {
+  const hour = currentHourInRome();
+  if (hour !== TARGET_HOUR) {
+    console.log(`Sono le ${hour} a Roma, non le ${TARGET_HOUR}: esco senza inviare nulla.`);
+    return;
+  }
+
+  const uid = requireEnv('FIREBASE_UID');
+  const serviceAccount = JSON.parse(requireEnv('FIREBASE_SERVICE_ACCOUNT_JSON'));
+  initializeApp({ credential: cert(serviceAccount) });
+  const db = getFirestore();
+
+  const today = todayInTimeZone();
+  const horizon = addDaysToLocalDate(today, 180);
+
+  const [settingsSnap, accountsSnap, rulesSnap, plannedSnap] = await Promise.all([
+    db.doc(`users/${uid}`).get(),
+    db.collection(`users/${uid}/accounts`).get(),
+    db.collection(`users/${uid}/recurringRules`).get(),
+    db
+      .collection(`users/${uid}/transactions`)
+      .where('status', '==', 'planned')
+      .where('effectiveDate', '>=', today)
+      .where('effectiveDate', '<=', horizon)
+      .get(),
+  ]);
+
+  const safetyBufferCents = (settingsSnap.data()?.['safetyBufferCents'] as number | undefined) ?? 0;
+  const accounts = accountsSnap.docs.map((doc) => doc.data() as Account).filter((account) => !account.archived);
+  const rules = rulesSnap.docs.map((doc) => doc.data() as RecurringRule);
+  const planned = plannedSnap.docs.map((doc) => doc.data() as Transaction);
+
+  const salaryRuleIds = new Set(rules.filter((rule) => rule.kind === 'salary').map((rule) => rule.id));
+  const plannedEntries = planned.map((transaction) => toForecastEntry(transaction, salaryRuleIds));
+  const storedKeys = new Set(
+    planned.map((transaction) => transaction.occurrenceKey).filter((key): key is string => !!key),
+  );
+
+  const availableCents = calculateAvailableCents(accounts);
+  const dueToday = rules.filter((rule) => rule.status === 'active' && rule.nextOccurrenceDate === today);
+  const nextSalary = findNextSalary(rules, today, plannedEntries);
+
+  const lines: string[] = [`📊 <b>Riepilogo di oggi</b> — ${formatLocalDate(today, 'long')}`, ''];
+
+  lines.push(`💰 Saldo spendibile ora: <b>${formatCents(availableCents)}</b>`);
+  lines.push('');
+
+  if (dueToday.length === 0) {
+    lines.push('📅 Nessuna scadenza oggi.');
+  } else {
+    const totalDueToday = dueToday.reduce((total, rule) => total + rule.amountCents, 0);
+    lines.push(`📅 <b>Scadenze di oggi</b> (totale ${formatCents(totalDueToday)}):`);
+    for (const rule of dueToday) {
+      lines.push(`• ${rule.description || rule.name}: ${formatCents(rule.amountCents)}`);
+    }
+  }
+  lines.push('');
+
+  if (nextSalary) {
+    const future = [
+      ...plannedEntries.filter((entry) => entry.date > today && entry.date <= nextSalary.date),
+      ...buildVirtualOccurrences(rules, addDaysToLocalDate(today, 1), nextSalary.date, storedKeys),
+    ];
+    const summary = calculateAvailableUntilSalary({
+      spendableBalanceCents: availableCents,
+      entriesBeforeSalary: future,
+      safetyBufferCents,
+      today,
+      salaryDate: nextSalary.date,
+    });
+    lines.push(
+      `⏳ Fino al prossimo stipendio (${formatLocalDate(nextSalary.date, 'short')}): <b>${formatCents(summary.availableCents)}</b>`,
+    );
+    lines.push(`   circa ${formatCents(summary.dailyCents)}/giorno per ${summary.daysRemaining} giorni`);
+    if (summary.deficitCents > 0) {
+      lines.push('');
+      lines.push(`⚠️ Rischi di andare in rosso prima dello stipendio: mancano ${formatCents(summary.deficitCents)}.`);
+    }
+  } else {
+    lines.push('⏳ Nessuno stipendio ricorrente configurato: previsione limitata al saldo attuale.');
+  }
+
+  await sendTelegramMessage(lines.join('\n'));
+  console.log('Recap inviato.');
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
