@@ -156,6 +156,12 @@ export class UserDataStore {
     );
   }
 
+  /** Overwrites the current balance directly, without touching the opening balance or creating a transaction. */
+  async correctBalance(account: Account, currentBalanceCents: number): Promise<void> {
+    await this.accountRepository.setBalances(this.uid, { [account.id]: currentBalanceCents });
+    this.setBalances({ [account.id]: currentBalanceCents });
+  }
+
   /** Mirrors in memory the balance changes already committed to Firestore. */
   applyBalanceEffects(effects: BalanceEffects): void {
     if (Object.keys(effects).length === 0) {
