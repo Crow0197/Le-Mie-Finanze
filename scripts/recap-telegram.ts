@@ -73,22 +73,21 @@ async function main(): Promise<void> {
   const today = todayInTimeZone();
   const horizon = addDaysToLocalDate(today, 180);
 
+  // Un solo filtro per query e il resto in JavaScript: il progetto evita apposta gli indici
+  // compositi di Firestore (vedi firestore.indexes.json), lo stesso pattern di transaction.repository.ts.
   const [settingsSnap, accountsSnap, rulesSnap, plannedSnap] = await Promise.all([
     db.doc(`users/${uid}`).get(),
     db.collection(`users/${uid}/accounts`).get(),
     db.collection(`users/${uid}/recurringRules`).get(),
-    db
-      .collection(`users/${uid}/transactions`)
-      .where('status', '==', 'planned')
-      .where('effectiveDate', '>=', today)
-      .where('effectiveDate', '<=', horizon)
-      .get(),
+    db.collection(`users/${uid}/transactions`).where('status', '==', 'planned').get(),
   ]);
 
   const safetyBufferCents = (settingsSnap.data()?.['safetyBufferCents'] as number | undefined) ?? 0;
   const accounts = accountsSnap.docs.map((doc) => doc.data() as Account).filter((account) => !account.archived);
   const rules = rulesSnap.docs.map((doc) => doc.data() as RecurringRule);
-  const planned = plannedSnap.docs.map((doc) => doc.data() as Transaction);
+  const planned = plannedSnap.docs
+    .map((doc) => doc.data() as Transaction)
+    .filter((transaction) => transaction.effectiveDate >= today && transaction.effectiveDate <= horizon);
 
   const salaryRuleIds = new Set(rules.filter((rule) => rule.kind === 'salary').map((rule) => rule.id));
   const plannedEntries = planned.map((transaction) => toForecastEntry(transaction, salaryRuleIds));
