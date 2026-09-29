@@ -1,0 +1,24 @@
+# Invia su Telegram un riepilogo giornaliero: saldo spendibile, scadenze di oggi
+# e quanto resta fino al prossimo stipendio (vedi scripts/recap-telegram.ts).
+# Gira due volte (7:00 e 8:00 UTC) per restare alle 9 di mattina a Roma sia in ora
+# solare che legale: lo script controlla l'ora e non invia nulla se non è il momento giusto.
+name: Recap giornaliero
+on:
+  schedule:
+    - cron: '0 7 * * *'
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+jobs:
+  recap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm install firebase-admin --no-save
+      - name: Invia il recap
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LE_MIE_FINANZE_9280F }}
+          FIREBASE_UID: ${{ secrets.FIREBASE_UID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npx tsx scripts/recap-telegram.ts
