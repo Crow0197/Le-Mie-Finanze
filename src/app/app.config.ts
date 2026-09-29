@@ -3,6 +3,7 @@ import {
   TitleStrategy,
   provideRouter,
   withComponentInputBinding,
+  withInMemoryScrolling,
   withViewTransitions,
 } from '@angular/router';
 import { routes } from './app.routes';
@@ -13,7 +14,12 @@ import { AppTitleStrategy } from './core/layout/app-title-strategy';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withViewTransitions(),
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
+    ),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     provideFirebase(),
     provideServiceWorker('ngsw-worker.js', {
