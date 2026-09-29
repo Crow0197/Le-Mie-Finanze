@@ -77,6 +77,9 @@
               <button type="button" class="icon-button" [attr.aria-label]="'Modifica ' + account.name" (click)="openForm(account)">
                 <app-icon name="pencil" [size]="18" />
               </button>
+              <button type="button" class="icon-button" [attr.aria-label]="'Correggi saldo di ' + account.name" (click)="correctBalance(account)">
+                <app-icon name="refresh-cw" [size]="18" />
+              </button>
               @if (store.defaultAccount()?.id !== account.id) {
                 <button type="button" class="icon-button" [attr.aria-label]="'Imposta ' + account.name + ' come predefinito'" [disabled]="busy()" (click)="setDefault(account)">
                   <app-icon name="star" [size]="18" />

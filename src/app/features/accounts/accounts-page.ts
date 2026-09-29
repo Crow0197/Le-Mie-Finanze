@@ -12,6 +12,7 @@ import { InfoHint } from '../../shared/ui/info-hint/info-hint';
 import { Skeleton } from '../../shared/ui/skeleton/skeleton';
 import { SnackbarService } from '../../shared/ui/snackbar/snackbar.service';
 import { AccountFormDialog } from './account-form-dialog';
+import { CorrectBalanceDialog } from './correct-balance-dialog';
 import { DefaultAccountDialog } from './default-account-dialog';
 
 @Component({
@@ -34,6 +35,10 @@ export class AccountsPage {
 
   protected openForm(account: Account | null = null): void {
     this.appDialog.open<boolean>(AccountFormDialog, account, 'account-form-title');
+  }
+
+  protected correctBalance(account: Account): void {
+    this.appDialog.open<boolean>(CorrectBalanceDialog, account, 'correct-balance-title');
   }
 
   protected async setDefault(account: Account): Promise<void> {
