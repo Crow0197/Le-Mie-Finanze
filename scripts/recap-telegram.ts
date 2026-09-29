@@ -56,8 +56,11 @@ async function sendTelegramMessage(text: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // Un avvio manuale (workflow_dispatch, per esempio per provarlo) invia subito,
+  // senza aspettare l'orario: quello serve solo per non duplicare l'invio schedulato.
+  const isManualRun = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
   const hour = currentHourInRome();
-  if (hour !== TARGET_HOUR) {
+  if (!isManualRun && hour !== TARGET_HOUR) {
     console.log(`Sono le ${hour} a Roma, non le ${TARGET_HOUR}: esco senza inviare nulla.`);
     return;
   }
