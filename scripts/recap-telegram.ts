@@ -3,7 +3,10 @@
  * e quanto resta fino al prossimo stipendio.
  *
  * Riusa gli stessi moduli di dominio (framework-agnostic, gli stessi della Dashboard)
- * così i numeri nel messaggio coincidono sempre con quelli dell'app.
+ * così i numeri nel messaggio coincidono sempre con quelli dell'app: la parte "fino al
+ * prossimo stipendio" replica lo stesso calcolo della card Riepilogo (cycleEnd/cycleDaily
+ * in dashboard.ts) — dal saldo di oggi si sottraggono solo le scadenze fino al giorno
+ * prima del prossimo stipendio, che quindi non viene mai contato come entrata.
  *
  * Eseguito da .github/workflows/recap-giornaliero.yml, programmato due volte al giorno
  * (7:00 e 8:00 UTC) per restare alle 9 di mattina a Roma sia in ora solare che legale:
@@ -11,14 +14,16 @@
  */
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { addDaysToLocalDate, APP_TIME_ZONE, formatLocalDate, todayInTimeZone } from '../src/app/domain/dates/local-date';
-import { calculateAvailableCents } from '../src/app/domain/forecast/balances';
 import {
-  buildVirtualOccurrences,
-  calculateAvailableUntilSalary,
-  findNextSalary,
-  toForecastEntry,
-} from '../src/app/domain/forecast/forecast';
+  addDaysToLocalDate,
+  APP_TIME_ZONE,
+  daysBetween,
+  formatLocalDate,
+  todayInTimeZone,
+} from '../src/app/domain/dates/local-date';
+import { calculateAvailableCents, calculateNetWorthCents } from '../src/app/domain/forecast/balances';
+import { buildVirtualOccurrences, toForecastEntry } from '../src/app/domain/forecast/forecast';
+import { resolveSalaryCycleRange } from '../src/app/domain/forecast/salary-cycle';
 import { formatCents } from '../src/app/domain/money/money';
 import type { Account } from '../src/app/domain/models/account';
 import type { RecurringRule } from '../src/app/domain/models/recurring-rule';
@@ -97,7 +102,7 @@ async function main(): Promise<void> {
 
   const availableCents = calculateAvailableCents(accounts);
   const dueToday = rules.filter((rule) => rule.status === 'active' && rule.nextOccurrenceDate === today);
-  const nextSalary = findNextSalary(rules, today, plannedEntries);
+  const cycle = resolveSalaryCycleRange(rules, today);
 
   const lines: string[] = [`📊 <b>Riepilogo di oggi</b> — ${formatLocalDate(today, 'long')}`, ''];
 
@@ -115,25 +120,35 @@ async function main(): Promise<void> {
   }
   lines.push('');
 
-  if (nextSalary) {
+  if (cycle) {
     const future = [
-      ...plannedEntries.filter((entry) => entry.date > today && entry.date <= nextSalary.date),
-      ...buildVirtualOccurrences(rules, addDaysToLocalDate(today, 1), nextSalary.date, storedKeys),
+      ...plannedEntries.filter((entry) => entry.date > today && entry.date <= cycle.endDate),
+      ...buildVirtualOccurrences(rules, addDaysToLocalDate(today, 1), cycle.endDate, storedKeys),
     ];
-    const summary = calculateAvailableUntilSalary({
-      spendableBalanceCents: availableCents,
-      entriesBeforeSalary: future,
-      safetyBufferCents,
-      today,
-      salaryDate: nextSalary.date,
-    });
+    let incomeCents = 0;
+    let expenseCents = 0;
+    for (const entry of future) {
+      if (entry.type === 'income') {
+        incomeCents += entry.amountCents;
+      } else if (entry.type === 'expense') {
+        expenseCents += entry.amountCents;
+      } else {
+        expenseCents += entry.feeCents ?? 0;
+      }
+    }
+    const balanceCents = calculateNetWorthCents(accounts) + incomeCents - expenseCents;
+    const days = Math.max(1, daysBetween(today, cycle.endDate) + 1);
+    const dailyCents = Math.floor(Math.max(0, balanceCents - safetyBufferCents) / days);
+
     lines.push(
-      `⏳ Fino al prossimo stipendio (${formatLocalDate(nextSalary.date, 'short')}): <b>${formatCents(summary.availableCents)}</b>`,
+      `⏳ Fino al prossimo stipendio (${formatLocalDate(cycle.endDate, 'short')}): <b>${formatCents(balanceCents)}</b>`,
     );
-    lines.push(`   circa ${formatCents(summary.dailyCents)}/giorno per ${summary.daysRemaining} giorni`);
-    if (summary.deficitCents > 0) {
+    lines.push(`   circa ${formatCents(dailyCents)}/giorno per ${days} giorni`);
+    if (balanceCents - safetyBufferCents < 0) {
       lines.push('');
-      lines.push(`⚠️ Rischi di andare in rosso prima dello stipendio: mancano ${formatCents(summary.deficitCents)}.`);
+      lines.push(
+        `⚠️ Rischi di andare in rosso prima dello stipendio: mancano ${formatCents(safetyBufferCents - balanceCents)}.`,
+      );
     }
   } else {
     lines.push('⏳ Nessuno stipendio ricorrente configurato: previsione limitata al saldo attuale.');
