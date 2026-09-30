@@ -1,12 +1,15 @@
 # Invia su Telegram un riepilogo giornaliero: saldo spendibile, scadenze di oggi
 # e quanto resta fino al prossimo stipendio (vedi scripts/recap-telegram.ts).
-# Gira due volte (7:00 e 8:00 UTC) per restare alle 9 di mattina a Roma sia in ora
+# Gira due volte (7:05 e 8:05 UTC) per restare alle 9 di mattina a Roma sia in ora
 # solare che legale: lo script controlla l'ora e non invia nulla se non è il momento giusto.
+# Orario spostato di 5 minuti dopo l'ora esatta: GitHub Actions rimanda (o a volte salta)
+# più spesso i cron programmati esattamente allo scoccare dell'ora, perché è il momento
+# di carico più alto (lo dice la documentazione ufficiale).
 name: Recap giornaliero
 on:
   schedule:
-    - cron: '0 7 * * *'
-    - cron: '0 8 * * *'
+    - cron: '5 7 * * *'
+    - cron: '5 8 * * *'
   workflow_dispatch:
 jobs:
   recap:
