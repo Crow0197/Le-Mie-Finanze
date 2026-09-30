@@ -29,7 +29,7 @@ import type { Account } from '../src/app/domain/models/account';
 import type { RecurringRule } from '../src/app/domain/models/recurring-rule';
 import type { Transaction } from '../src/app/domain/models/transaction';
 
-const TARGET_HOUR = '09';
+const TARGET_HOUR = '15'; // TEMPORANEO: era '09', alzata per il test del cron delle 13:08 UTC, da rimettere dopo
 
 function requireEnv(name: string): string {
   const value = process.env[name];
