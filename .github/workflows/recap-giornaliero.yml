@@ -15,7 +15,7 @@ jobs:
   recap:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: npm ci
       - run: npm install firebase-admin --no-save
       - name: Invia il recap
